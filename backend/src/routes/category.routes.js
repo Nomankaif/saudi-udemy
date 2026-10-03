@@ -1,0 +1,15 @@
+import { Router } from "express";
+import { requireAuth, requireAdmin, requirePermission } from "../middleware/auth.middleware.js";
+import { asyncHandler } from "../utils/async-handler.js";
+import { listCategories, listPublicCategories, addCategory, addSubcategory, updateCategory, deleteCategory, updateSubcategory, deleteSubcategory } from "../controllers/category.controller.js";
+const router = Router();
+router.get("/public", asyncHandler(listPublicCategories));
+router.use(requireAuth, requireAdmin);
+router.get("/", requirePermission("exams.view"), asyncHandler(listCategories));
+router.post("/", requirePermission("exams.edit"), asyncHandler(addCategory));
+router.post("/subcategories", requirePermission("exams.edit"), asyncHandler(addSubcategory));
+router.patch("/subcategories", requirePermission("exams.edit"), asyncHandler(updateSubcategory));
+router.delete("/subcategories", requirePermission("exams.edit"), asyncHandler(deleteSubcategory));
+router.patch("/", requirePermission("exams.edit"), asyncHandler(updateCategory));
+router.delete("/", requirePermission("exams.edit"), asyncHandler(deleteCategory));
+export default router;

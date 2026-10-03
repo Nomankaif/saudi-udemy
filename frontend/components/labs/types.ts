@@ -1,0 +1,10 @@
+export type Device = { name: string; type: string; console?: boolean; gateway?: string; initialConfig?: string; interfaces: Record<string, { ip?: string; status: string }> };
+export type LabLink = { fromDevice: string; fromInterface: string; toDevice: string; toInterface: string };
+export type Rule = { type: string; interface?: string; value?: string; nextHop?: string; expect?: string; distance?: number };
+export type Task = { id: number; text: string; device: string; hint?: string; check?: string[][]; rules?: Rule[]; points?: number };
+export type Lab = { engine?: string; authorNotes?: string; links?: LabLink[]; imageUrl?: string; _id: string; title: string; category: string; subcategory?: string; instructions: string; topology: string; diagram?: string; devices: Device[]; tasks: Task[]; access: string; examId?: string; durationMinutes: number; deviceCount?: number; taskCount?: number };
+export type Grade = { correct: number; total: number; score: number; tasks: { id: number; text: string; device: string; passed: boolean; solution?: string }[] };
+export type Session = { _id: string; labId: string; lab: Lab; mode: string; status: string; deadline?: string; solutionViewed: boolean; prompts: Record<string, string>; transcript: { device: string; input: string; output: string }[]; result?: Grade };
+export const field = "w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-700";
+export const button = "inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+export const primary = "inline-flex items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50";

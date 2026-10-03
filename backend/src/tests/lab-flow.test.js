@@ -1,0 +1,115 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import mongoose from "mongoose";
+import app from "../app.js";
+import LabAttempt from "../models/lab-attempt.model.js";
+import Exam from "../models/exam.model.js";
+import User from "../models/user.model.js";
+import AccessRequest from "../models/access-request.model.js";
+import { LABS } from "../vendor/lab-ccna/labData.js";
+import { validateLab, execute, initialStates, grade } from "../services/lab.service.js";
+
+const fixture = () => ({ title: "Static route practice", category: "Routing", access: "FREE", durationMinutes: 5, instructions: "Configure a static route.", topology: "R1 — R2", devices: [{ name: "R1", type: "router", interfaces: { "Ethernet0/0": { ip: "10.0.0.1/24", status: "up" } } }], tasks: [{ id: 1, device: "R1", text: "Route 192.168.0.0/24 via 10.0.0.2", hint: "ip route 192.168.0.0 255.255.255.0 10.0.0.2", check: [["ip route", "192.168.0.0", "255.255.255.0", "10.0.0.2"]] }] });
+test("upstream templates validate; CLI and token-boundary grading", () => {
+  const cover = "/uploads/media/cover-test.png";
+  assert.equal(validateLab({ ...fixture(), imageUrl: cover }).imageUrl, cover);
+  assert.equal(validateLab(fixture()).imageUrl, "");
+  assert.throws(() => validateLab({ ...fixture(), imageUrl: "javascript:alert(1)" }));
+  assert.throws(() => validateLab({ ...fixture(), imageUrl: "/uploads/media/../secret" }));
+  for (const lab of LABS) validateLab({ ...lab, access: "FREE", durationMinutes: 60 });
+  const snapshot = validateLab(fixture());
+  const states = initialStates(snapshot);
+  for (const command of ["enable", "configure terminal", "ip route 192.168.0.0 255.255.255.0 10.0.0.20"]) states.R1 = execute(states.R1, command).state;
+  assert.equal(grade({ snapshot, states }).score, 0, "A partial IP match must not pass");
+  states.R1 = execute(states.R1, snapshot.tasks[0].hint).state;
+  assert.equal(grade({ snapshot, states }).score, 100);
+  assert.throws(() => execute(states.R1, "interface range e0/0-999999999"));
+  assert.throws(() => execute(states.R1, "hostname __proto__"));
+  assert.throws(() => validateLab({ ...fixture(), tasks: [] }));
+});
+
+test("MongoDB lab publishing, ownership, premium approval, resume and timed results", { timeout: 60000 }, async () => {
+  const dbName = `lab_flow_test_${randomUUID().replaceAll("-", "")}`;
+  process.env.ADMIN_PASSWORD = "lab-test-admin-password";
+  await mongoose.connect(`mongodb://127.0.0.1:27017/${dbName}`, { serverSelectionTimeoutMS: 5000 });
+  const server = app.listen(0);
+  await new Promise(resolve => server.once("listening", resolve));
+  const base = `http://127.0.0.1:${server.address().port}/api`;
+  async function call(path, method = "GET", body, cookie = "", expected = 200) {
+    const response = await fetch(base + path, { method, headers: { "Content-Type": "application/json", Cookie: cookie }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const data = await response.json();
+    assert.equal(response.status, expected, `${method} ${path}: ${JSON.stringify(data).slice(0, 500)}`);
+    return { data, cookie: response.headers.getSetCookie().map(v => v.split(";")[0]).join("; ") };
+  }
+  try {
+    const admin = (await call("/auth/admin/login", "POST", { password: process.env.ADMIN_PASSWORD })).cookie;
+    const studentBody = { firstName: "Lab", lastName: "Tester", email: "lab@test.invalid", password: "lab-student-test-password" };
+    await call("/auth/register", "POST", studentBody, "", 201);
+    const student = (await call("/auth/login", "POST", studentBody)).cookie;
+    await call("/labs/admin/all", "GET", undefined, student, 403);
+    assert.equal((await call("/labs/admin/import", "POST", {}, admin)).data.imported, 27);
+    assert.equal((await call("/labs/admin/import", "POST", {}, admin)).data.imported, 0);
+    assert.equal((await call("/labs")).data.length, 0);
+    const lab = (await call("/labs/admin", "POST", fixture(), admin)).data;
+    await call(`/labs/admin/${lab._id}/preview`, "POST", {}, student, 403);
+    const preview = (await call(`/labs/admin/${lab._id}/preview`, "POST", {}, admin, 201)).data;
+    assert.equal(preview.mode, "PRACTICE");
+    await call(`/labs/attempts/${preview._id}`, "GET", undefined, student, 404);
+    await call(`/labs/${lab._id}/start`, "POST", { mode: "PRACTICE" }, student, 404);
+    await call(`/labs/admin/${lab._id}/publish`, "POST", {}, admin);
+    const catalog = (await call("/labs")).data;
+    assert.equal(catalog.length, 1);
+    assert.equal(catalog[0].tasks, undefined);
+    assert.equal(catalog[0].devices, undefined);
+    assert.equal(catalog[0].taskCount, 1);
+    await call(`/labs/${lab._id}/start`, "POST", { mode: "PRACTICE" }, "", 401);
+    let attempt = (await call(`/labs/${lab._id}/start`, "POST", { mode: "PRACTICE" }, student, 201)).data;
+    const root = `/labs/attempts/${attempt._id}`;
+    await call(root, "GET", undefined, admin, 404);
+    assert.equal(attempt.states, undefined);
+    assert.match(attempt.lab.diagram, /<svg/);
+    assert.equal(attempt.lab.tasks[0].hint, undefined);
+    const completion = (await call(`${root}/complete`, "POST", { device: "R1", input: "en" }, student)).data;
+    assert.ok(completion.matches.some(m => m.word === "enable"));
+    await call(`${root}/command`, "POST", { device: "R9", command: "enable" }, student, 400);
+    for (const command of ["enable", "configure terminal", fixture().tasks[0].hint]) attempt = (await call(`${root}/command`, "POST", { device: "R1", command }, student)).data;
+    assert.equal((await call(root, "GET", undefined, student)).data.transcript.length, 3);
+    assert.equal((await call(`${root}/check`, "POST", {}, student)).data.score, 100);
+    assert.equal((await call(`${root}/check`, "POST", {}, student)).data.tasks[0].solution, undefined);
+    await call(`${root}/solution`, "POST", {}, student);
+    assert.equal((await call(root, "GET", undefined, student)).data.solutionViewed, true);
+    // A new published version does not mutate an active attempt's snapshot.
+    await call(`/labs/admin/${lab._id}`, "PUT", { ...fixture(), title: "Updated title" }, admin);
+    await call(`/labs/admin/${lab._id}/publish`, "POST", {}, admin);
+    assert.equal((await call(root, "GET", undefined, student)).data.lab.title, fixture().title);
+    assert.equal((await call(`${root}/submit`, "POST", {}, student)).data.result.score, 100);
+    assert.equal((await call(`${root}/submit`, "POST", {}, student)).data.result.score, 100);
+    await call(`${root}/command`, "POST", { device: "R1", command: "exit" }, student, 409);
+    await call(`/labs/${lab._id}/start`, "POST", { mode: "EXAM", durationMinutes: 0 }, student, 400);
+    const timed = (await call(`/labs/${lab._id}/start`, "POST", { mode: "EXAM", durationMinutes: 1 }, student, 201)).data;
+    const timedRoot = `/labs/attempts/${timed._id}`;
+    for (const action of ["check", "solution", "reset"]) await call(`${timedRoot}/${action}`, "POST", {}, student, 403);
+    await LabAttempt.updateOne({ _id: timed._id }, { $set: { deadline: new Date(Date.now() - 1000) } });
+    assert.equal((await call(timedRoot, "GET", undefined, student)).data.status, "SUBMITTED");
+    const exam = await Exam.create({ title: "Lab entitlement", slug: randomUUID(), shortDescription: "Test", category: "Routing", status: "PUBLISHED" });
+    const premium = { ...fixture(), access: "PREMIUM", examId: String(exam._id) };
+    await call(`/labs/admin/${lab._id}`, "PUT", premium, admin);
+    await call(`/labs/admin/${lab._id}/publish`, "POST", {}, admin);
+    await call(`/labs/${lab._id}/start`, "POST", { mode: "PRACTICE" }, student, 403);
+    const user = await User.findOne({ email: studentBody.email });
+    const approval = await AccessRequest.create({ userId: user._id, examId: exam._id, status: "APPROVED", accessExpiresAt: new Date(Date.now() + 60000) });
+    const unlocked = (await call(`/labs/${lab._id}/start`, "POST", { mode: "PRACTICE" }, student, 201)).data;
+    await AccessRequest.updateOne({ _id: approval._id }, { $set: { status: "REVOKED" } });
+    await call(`/labs/attempts/${unlocked._id}/command`, "POST", { device: "R1", command: "enable" }, student, 403);
+    await call(`/labs/admin/${lab._id}`, "DELETE", {}, admin);
+    assert.equal((await call("/labs")).data.length, 0);
+    assert.equal((await call(root, "GET", undefined, student)).data.result.score, 100);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    assert.equal(mongoose.connection.name, dbName);
+    assert.match(dbName, /^lab_flow_test_[a-f0-9]+$/);
+    await mongoose.connection.dropDatabase();
+    await mongoose.disconnect();
+  }
+});

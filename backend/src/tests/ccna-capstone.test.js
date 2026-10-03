@@ -1,0 +1,33 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { CCNA_CAPSTONE } from "../simulation/ccna-capstone.js";
+import { validateLab, publicLab } from "../services/lab.service.js";
+import { simulate } from "../services/netsim.service.js";
+
+test("CCNA capstone: all supported devices and grading rules, clean start, verified solution and negative checks", { timeout: 60000 }, async () => {
+  const lab = validateLab(CCNA_CAPSTONE);
+  assert.equal(lab.devices.length, 8);
+  assert.equal(lab.tasks.length, 24);
+  assert.deepEqual([...new Set(lab.devices.map(d => d.type))].sort(), ["host", "router", "switch"]);
+  assert.equal(lab.devices.filter(d => d.console === false).length, 1);
+  assert.deepEqual([...new Set(lab.tasks.flatMap(t => t.rules.map(r => r.type)))].sort(), ["access_vlan", "config", "interface_ip", "interface_up", "ospf_route", "ping", "route", "saved", "static_route", "trunk", "vlan"]);
+  assert.equal((await simulate(lab, {}, "grade")).score, 0);
+  const solution = await simulate(lab, {}, "validate");
+  assert.deepEqual(solution.errors, []);
+  assert.equal(solution.valid, true);
+  assert.equal(solution.score, 100);
+  const journal = lab.tasks.flatMap(t => t.hint.split("\n").filter(Boolean).map(command => ({ device: t.device, command })));
+  const brokenVlan = [...journal, ...["configure terminal", "interface FastEthernet0/3", "switchport access vlan 10", "end"].map(command => ({ device: "SW2", command }))];
+  const vlanGrade = await simulate(lab, { journal: brokenVlan }, "grade");
+  assert.equal(vlanGrade.tasks[6].passed, false, "PC3 in the wrong access VLAN must fail");
+  assert.equal(vlanGrade.tasks[15].passed, false, "Reachable isolated PC must fail the isolation test");
+  assert.equal(vlanGrade.tasks.at(-1).passed, false, "Changing saved switch configuration must invalidate save check");
+  const brokenOspf = journal.map(entry => entry.device === "R2" ? { ...entry, command: entry.command.replace("area 0", "area 1") } : entry);
+  const routingGrade = await simulate(lab, { journal: brokenOspf }, "grade");
+  assert.equal(routingGrade.tasks[12].passed, false);
+  assert.equal(routingGrade.tasks[13].passed, false);
+  assert.equal(routingGrade.tasks[16].passed, false, "PC1-to-branch must fail without matching OSPF areas");
+  const safe = publicLab(lab);
+  assert.ok(safe.tasks.every(t => t.rules === undefined && t.hint === undefined));
+  assert.ok(safe.devices.every(d => d.initialConfig === undefined));
+});

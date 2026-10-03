@@ -1,0 +1,10 @@
+packages:
+  - "frontend"
+  - "backend"
+
+allowBuilds:
+  '@parcel/watcher': false
+  unrs-resolver: false
+
+onlyBuiltDependencies:
+  - "sharp"

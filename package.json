@@ -1,0 +1,18 @@
+{
+  "name": "exam-platform",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev": "concurrently -n frontend,backend -c magenta,cyan \"pnpm --filter exam-platform-frontend dev\" \"pnpm --filter exam-platform-backend dev\"",
+    "dev:frontend": "pnpm --filter exam-platform-frontend dev",
+    "dev:backend": "pnpm --filter exam-platform-backend dev",
+    "build": "pnpm --filter exam-platform-frontend build",
+    "lint": "pnpm --filter exam-platform-frontend lint",
+    "typecheck": "pnpm --filter exam-platform-frontend typecheck",
+    "check:backend": "pnpm --filter exam-platform-backend check"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,1 @@
+export default function Terms(){return <article className="mx-auto max-w-4xl px-5 py-16 text-lg leading-8 text-slate-700"><h1 className="text-4xl font-extrabold text-slate-950">Terms and conditions</h1><p className="mt-6">This page is managed through the content management system. Final terms will be supplied and approved by the business owner.</p></article>}
