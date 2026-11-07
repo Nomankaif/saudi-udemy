@@ -19,27 +19,33 @@ import { DragDropQuestion, DragDropReview } from "@/components/drag-drop-questio
 import { DragDropEditor, dragDropIssues } from "./drag-drop-editor";
 import { QuestionContent } from "@/components/question-content";
 import { ChoiceQuestion } from "@/components/choice-question";
+import { api, messageOf } from "@/lib/api";
 import { inputClass, primaryButton, secondaryButton } from "./ui";
-export const blankQuestion = (): Question => ({
-  type: "SINGLE_CHOICE",
+export const blankQuestion = (type: Question["type"] = "SINGLE_CHOICE"): Question => ({
+  type,
   text: "",
-  options: ["A", "B", "C", "D"].map((id) => ({ id, text: "" })),
+  options: type === "IMAGE_PBQ" ? [] : ["A", "B", "C", "D"].map((id) => ({ id, text: "" })),
+  ...(type === "DRAG_DROP" ? { dropTargets: [{ id: "group1", label: "", capacity: 1 }, { id: "group2", label: "", capacity: 1 }], correctPlacements: [] } : {}),
+  ...(type === "IMAGE_PBQ" ? { pbq: { alt: "", areas: [] }, pbqKey: [] } : {}),
   correctOptionIds: [],
   explanation: "",
-  accessLevel: "PREMIUM",
+  accessLevel: "FREE",
   topic: "General",
   difficulty: "MEDIUM",
   imageUrl: "",
   displayOrder: 0,
 });
 export function questionIssues(q: Question) {
+  const ids = q.options.map(option => option.id);
   return [
     !q.text.trim() && "Enter a question",
-    ...(q.type === "IMAGE_PBQ" ? pbqIssues(q) : q.type === "DRAG_DROP" ? dragDropIssues(q) : [(q.options.length !== 4 || q.options.some((o) => !o.text.trim())) && "Complete all four options",
-      (q.type === "MULTIPLE_CHOICE" ? q.correctOptionIds.length < 2 || q.correctOptionIds.length > 4 : q.correctOptionIds.length !== 1) && (q.type === "MULTIPLE_CHOICE" ? "Select two to four correct answers" : "Select exactly one correct answer"),
-      (new Set(q.correctOptionIds).size !== q.correctOptionIds.length || q.correctOptionIds.some(id => !["A", "B", "C", "D"].includes(id))) && "Select different valid answers (A–D)"]),
-    !q.explanation.trim() && "Add an explanation",
+    ...(q.type === "IMAGE_PBQ" ? pbqIssues(q) : q.type === "DRAG_DROP" ? dragDropIssues(q) : [(q.options.length < 2 || q.options.length > 8 || q.options.some((o, index) => o.id !== String.fromCharCode(65 + index) || !o.text.trim())) && "Complete two to eight consecutive options (A–H)",
+      (q.type === "MULTIPLE_CHOICE" ? q.correctOptionIds.length < 2 || q.correctOptionIds.length > q.options.length : q.correctOptionIds.length !== 1) && (q.type === "MULTIPLE_CHOICE" ? "Select two or more correct answers" : "Select exactly one correct answer"),
+      (new Set(q.correctOptionIds).size !== q.correctOptionIds.length || q.correctOptionIds.some(id => !ids.includes(id))) && "Select different answers from the available options"]),
   ].filter(Boolean) as string[];
+}
+export function importQuestionIssues(q: Question) {
+  return questionIssues(q);
 }
 export function QuestionEditor({
   initial,
@@ -47,15 +53,22 @@ export function QuestionEditor({
   busy = false,
   importMode = false,
   message,
+  fixedType,
+  singleItem = false,
+  onPublish,
 }: {
   initial: Question;
   onSave: (q: Question, next: boolean) => Promise<void>;
   busy?: boolean;
   importMode?: boolean;
   message?: string;
+  fixedType?: "DRAG_DROP" | "IMAGE_PBQ";
+  singleItem?: boolean;
+  onPublish?: (q: Question) => Promise<void>;
 }) {
   const [q, setQ] = useState(initial);
   const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState("");
   const [previewAnswers, setPreviewAnswers] = useState<PbqAnswer[]>([]);
   const [preview, setPreview] = useState(false);
   const [previewSelection, setPreviewSelection] = useState<string[]>([]);
@@ -75,16 +88,28 @@ export function QuestionEditor({
     el.focus();
   }
   const issues = questionIssues(q);
+  async function uploadQuestionImage(file?: File) {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setImageError("Choose a PNG, JPG or WebP image up to 5 MB.");
+      return;
+    }
+    setUploading(true); setImageError("");
+    try {
+      const body = new FormData(); body.set("file", file);
+      const uploaded = await api<{ url: string }>("/media/pbq", { method: "POST", body });
+      setQ(current => ({ ...current, imageUrl: uploaded.url }));
+    } catch (error) { setImageError(messageOf(error)); }
+    finally { setUploading(false); }
+  }
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+    <section className={importMode ? "bg-white" : "rounded-xl border border-slate-200 bg-white shadow-sm"}>
+      {!importMode && <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:px-6">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-widest text-violet-600">
-            Question workspace
-          </p>
-          <h2 className="mt-1 text-xl font-bold">
+          <h2 className="text-lg font-bold text-slate-950">
             {q._id ? "Edit question" : "Create a question"}
           </h2>
+          <p className="mt-0.5 text-xs text-slate-500">Save a draft now; publish when the answer is ready.</p>
         </div>
         <button
           className={secondaryButton}
@@ -94,8 +119,8 @@ export function QuestionEditor({
           {preview ? <Pencil size={16} /> : <Eye size={16} />}
           {preview ? "Editor" : "Student preview"}
         </button>
-      </div>
-      <fieldset disabled={busy || uploading} className="min-w-0 space-y-6 p-6 sm:p-8">
+      </div>}
+      <fieldset disabled={busy || uploading} className="min-w-0 space-y-5 px-5 py-5 sm:px-6">
         {preview ? (
           <div className="space-y-5">
             <p className="text-xs font-bold uppercase text-violet-600">
@@ -110,14 +135,14 @@ export function QuestionEditor({
               />
             )}
             {q.type === "IMAGE_PBQ" ? <><ImagePbq imageUrl={q.imageUrl} definition={q.pbq || {alt: "", areas: []}} value={previewAnswers} onChange={setPreviewAnswers}/><details className="rounded border border-slate-200 p-4"><summary className="cursor-pointer text-sm font-semibold">View answer key</summary><div className="mt-4"><PbqReview definition={q.pbq || {alt: "", areas: []}} expected={q.pbqKey || []} answers={previewAnswers}/></div></details></> : q.type === "DRAG_DROP" ? <><DragDropQuestion items={q.options} targets={q.dropTargets || []} value={previewPlacements} onChange={setPreviewPlacements} /><details className="rounded-lg border border-slate-200 p-4"><summary className="cursor-pointer text-sm font-semibold">View answer key</summary><div className="mt-4"><DragDropReview items={q.options} targets={q.dropTargets || []} expected={q.correctPlacements || []} /></div></details></> : <><ChoiceQuestion options={q.options} multiple={q.type === "MULTIPLE_CHOICE"} value={previewSelection} onChange={setPreviewSelection} /><details className="rounded-lg border border-slate-200 p-4"><summary className="cursor-pointer text-sm font-semibold">View answer key</summary><p className="mt-3 text-sm">Correct {q.type === "MULTIPLE_CHOICE" ? "answers" : "answer"}: {q.correctOptionIds.join(", ") || "Not configured"}</p></details></>}
-            <div className="rounded-xl bg-violet-50 p-5">
+            {q.explanation.trim() && <div className="rounded-xl bg-violet-50 p-5">
               <h3 className="mb-2 font-bold">Answer explanation</h3>
               <QuestionContent text={q.explanation} />
-            </div>
+            </div>}
           </div>
         ) : (
           <>
-            <label className="grid gap-2 text-sm font-semibold">Question type<select value={q.type || "SINGLE_CHOICE"} className={`${inputClass} rounded-lg`} onChange={e => {
+            {fixedType ? <div className="grid max-w-sm gap-2 text-sm font-semibold"><span>Question type</span><span className={`${inputClass} rounded-lg bg-slate-50`}>{fixedType === "DRAG_DROP" ? "Drag and drop" : "Image-based PBQ"}</span></div> : <label className="grid max-w-sm gap-2 text-sm font-semibold">Question type<select value={q.type || "SINGLE_CHOICE"} className={`${inputClass} rounded-lg`} onChange={e => {
               const type = e.target.value as Question["type"];
               const isChoice = (value: Question["type"]) => !value || value === "SINGLE_CHOICE" || value === "MULTIPLE_CHOICE";
               if (isChoice(q.type) && isChoice(type)) {
@@ -130,13 +155,13 @@ export function QuestionEditor({
               setPreviewAnswers([]);
               setPreviewSelection([]);
               setQ({ ...q, type, pbq: type === "IMAGE_PBQ" ? {alt: "", areas: []} : undefined, pbqKey: [], correctOptionIds: [], correctPlacements: [], options: ["A", "B", "C", "D"].map(id => ({ id, text: "" })), dropTargets: type === "DRAG_DROP" ? [{ id: "group1", label: "", capacity: 1 }, { id: "group2", label: "", capacity: 1 }] : [] });
-            }}><option value="SINGLE_CHOICE">Single choice</option><option value="MULTIPLE_CHOICE">Multiple answers</option>{!importMode && <><option value="DRAG_DROP">Drag and drop</option><option value="IMAGE_PBQ">Image-based PBQ</option></>}</select></label>
+            }}><option value="SINGLE_CHOICE">Single choice</option><option value="MULTIPLE_CHOICE">Multiple answers</option></select></label>}
             <div className="min-w-0">
               <label htmlFor="question-text" className="text-sm font-bold">
                 Question
               </label>
               <div className="mt-2 overflow-hidden rounded-xl border border-slate-300">
-                <div className="flex gap-1 border-b border-slate-200 bg-slate-50 p-2">
+                <div className="flex gap-1 border-b border-slate-200 bg-slate-50 p-1.5">
                   {[
                     [Bold, "Bold", "**", "**"],
                     [Italic, "Italic", "*", "*"],
@@ -164,51 +189,39 @@ export function QuestionEditor({
                   id="question-text"
                   value={q.text}
                   onChange={(e) => setQ({ ...q, text: e.target.value })}
-                  rows={6}
+                  rows={4}
                   placeholder="Write a clear question or scenario…"
-                  className="w-full resize-y p-4 leading-7 outline-none"
+                  className="min-h-28 w-full resize-y p-3.5 leading-6 outline-none"
                 />
               </div>
             </div>
-            {q.type !== "IMAGE_PBQ" && <label className="block text-sm font-bold">
-              <span className="flex items-center gap-2">
-                <ImagePlus size={16} />
-                Optional image URL
-              </span>
-              <input
-                className={`${inputClass} mt-2 w-full rounded-lg`}
-                value={q.imageUrl}
-                placeholder="https://…"
-                onChange={(e) => setQ({ ...q, imageUrl: e.target.value })}
-              />
-            </label>}
             {q.type === "IMAGE_PBQ" ? <PbqEditor question={q} onChange={setQ} onUploading={setUploading}/> : q.type === "DRAG_DROP" ? <DragDropEditor question={q} onChange={setQ} /> : <div className="min-w-0">
               <h3 className="font-bold">Answer options</h3>
               <p className="mt-1 text-sm text-slate-500">
-                {q.type === "MULTIPLE_CHOICE" ? "Check every correct answer (two to four). Students must select all correct options and no incorrect ones." : "Select the circle beside the correct answer."}
+                {q.type === "MULTIPLE_CHOICE" ? "Check every correct answer (two or more). Students must select all correct options and no incorrect ones." : "Select the circle beside the correct answer."}
               </p>
-              <div className="mt-4 space-y-3">
+              <div className="mt-3 space-y-2">
                 {q.options.map((option, index) => (
                   <label
                     key={option.id}
-                    className={`flex items-start gap-3 rounded-xl border p-4 ${q.correctOptionIds.includes(option.id) ? "border-emerald-400 bg-emerald-50" : "border-slate-200"}`}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${q.correctOptionIds.includes(option.id) ? "border-emerald-400 bg-emerald-50" : "border-slate-200"}`}
                   >
                     <input
                       aria-label={`Option ${option.id} is correct`}
                       type={q.type === "MULTIPLE_CHOICE" ? "checkbox" : "radio"}
                       name="correct-option"
-                      className="mt-3 size-4 accent-emerald-600"
+                      className="size-4 accent-emerald-600"
                       checked={q.correctOptionIds.includes(option.id)}
                       onChange={() =>
                         setQ({ ...q, correctOptionIds: q.type === "MULTIPLE_CHOICE" ? q.correctOptionIds.includes(option.id) ? q.correctOptionIds.filter(id => id !== option.id) : [...q.correctOptionIds, option.id] : [option.id] })
                       }
                     />
-                    <span className="mt-2 text-sm font-bold text-slate-500">
+                    <span className="text-sm font-bold text-slate-500">
                       {option.id}
                     </span>
                     <input
                       aria-label={`Option ${option.id}`}
-                      className="min-w-0 flex-1 bg-transparent px-2 py-2 outline-none"
+                      className="min-w-0 flex-1 bg-transparent px-1 py-1.5 outline-none"
                       placeholder={`Write option ${option.id}`}
                       value={option.text}
                       onChange={(e) =>
@@ -221,17 +234,37 @@ export function QuestionEditor({
                       }
                     />
                     {q.correctOptionIds.includes(option.id) && (
-                      <Check className="mt-2 text-emerald-600" size={18} />
+                      <Check className="text-emerald-600" size={18} />
                     )}
                   </label>
                 ))}
               </div>
+              <div className="mt-3 flex flex-wrap gap-3">
+                {q.options.length < 8 && <button className={secondaryButton} onClick={() => setQ({ ...q, options: [...q.options, { id: String.fromCharCode(65 + q.options.length), text: "" }] })}>Add option</button>}
+                {q.options.length > 2 && <button className={secondaryButton} onClick={() => {
+                  const removed = q.options.at(-1)?.id;
+                  setQ({ ...q, options: q.options.slice(0, -1), correctOptionIds: q.correctOptionIds.filter(id => id !== removed) });
+                }}>Remove last option</button>}
+              </div>
             </div>}
+            {q.type !== "IMAGE_PBQ" && <label className="block text-sm font-bold">
+              <span className="flex items-center gap-2">
+                <ImagePlus size={16} />
+                Optional image URL
+              </span>
+              <input
+                className={`${inputClass} mt-2 w-full rounded-lg`}
+                value={q.imageUrl}
+                placeholder="https://…"
+                onChange={(e) => setQ({ ...q, imageUrl: e.target.value })}
+              />
+            </label>}
+            {q.type === "DRAG_DROP" && <div className="flex flex-wrap items-center gap-3"><label className={`${secondaryButton} cursor-pointer rounded-lg`}><ImagePlus size={16} />{uploading ? "Uploading…" : q.imageUrl ? "Replace exhibit image" : "Upload exhibit image"}<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={uploading} onChange={event => { void uploadQuestionImage(event.target.files?.[0]); event.target.value = ""; }} /></label>{q.imageUrl && <button type="button" className="text-sm font-semibold text-rose-700" onClick={() => setQ({ ...q, imageUrl: "" })}>Remove image</button>}{imageError && <p role="alert" className="w-full text-sm text-rose-700">{imageError}</p>}</div>}
             <label className="block text-sm font-bold">
-              {q.type === "MULTIPLE_CHOICE" ? "Why are these answers correct?" : "Why is this answer correct?"}
+              Answer explanation (optional)
               <textarea
                 className={`${inputClass} mt-2 w-full rounded-xl leading-7`}
-                rows={4}
+                rows={3}
                 value={q.explanation}
                 onChange={(e) => setQ({ ...q, explanation: e.target.value })}
                 placeholder="Explain the reasoning. Markdown is supported."
@@ -291,22 +324,22 @@ export function QuestionEditor({
         )}
         {issues.length > 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p className="font-semibold">Before publishing this question</p>
+            <p className="font-semibold">{importMode ? "Fix these before moving to Ready" : "Before publishing this question"}</p>
             <ul className="mt-2 list-disc space-y-1 pl-5">{issues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
-            <p className="mt-3 text-xs">You can save an unfinished draft. Resolve these issues before publishing.</p>
+            {!importMode && <p className="mt-3 text-xs">You can save an unfinished draft. Resolve these issues before publishing.</p>}
           </div>
         )}
         {message && <p role="status" className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{message}</p>}
-        <div className="sticky bottom-0 flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-white py-4">
+        <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-wrap items-center justify-end gap-3 rounded-b-xl border-t border-slate-200 bg-white/95 px-5 py-3 shadow-[0_-6px_16px_rgba(15,23,42,0.04)] backdrop-blur sm:-mx-6 sm:px-6">
           <button
-            disabled={busy || !q.text.trim()}
+            disabled={busy || !q.text.trim() || (importMode && importQuestionIssues(q).length > 0)}
             className={`${secondaryButton} disabled:opacity-40`}
             onClick={() => void onSave(q, false)}
           >
             <Save size={16} />
-            {importMode ? "Apply corrections" : "Save draft"}
+            {importMode ? "Save & move to Ready" : "Save draft"}
           </button>
-          {!importMode && (
+          {!importMode && !singleItem && (
             <button
               disabled={busy || !q.text.trim()}
               className={`${primaryButton} disabled:opacity-40`}
@@ -315,6 +348,7 @@ export function QuestionEditor({
               Save & add next
             </button>
           )}
+          {onPublish && <button type="button" disabled={busy || uploading || issues.length > 0} className={`${primaryButton} rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40`} onClick={() => void onPublish(q)}>Save and publish</button>}
         </div>
       </fieldset>
     </section>

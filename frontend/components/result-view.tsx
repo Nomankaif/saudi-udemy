@@ -79,7 +79,7 @@ export function ResultView({ id }: { id: string }) {
               <p className="mt-3 text-sm text-slate-500">
                 {data.result.passed
                   ? "Passing target reached"
-                  : "Keep practicing — review your explanations below"}{" "}
+                  : "Keep practicing — review your answers below"}{" "}
                 · Target {data.attempt.passingPercentage}%
               </p>
             </div>
@@ -189,8 +189,8 @@ export function ResultView({ id }: { id: string }) {
           <div className="space-y-2">
             <h2 className="text-2xl font-bold">Answer review</h2>
             <p className="text-sm text-slate-500">
-              Compare your choices with the correct answers and learn from each
-              explanation. Partially correct PBQs earn points, but count as incorrect in the question totals.
+              Compare your choices with the correct answers and review any available explanations.
+              Partially correct PBQs earn points, but count as incorrect in the question totals.
             </p>
           </div>
           {data.questions.map((q) => {
@@ -276,12 +276,12 @@ export function ResultView({ id }: { id: string }) {
                   ))}
                 </div>
                 </>}
-                <div className="rounded-xl bg-slate-50 p-4">
+                {q.explanation?.trim() && <div className="rounded-xl bg-slate-50 p-4">
                   <h3 className="mb-2 text-sm font-bold">
                     {q.type === "MULTIPLE_CHOICE" ? "Why these answers are correct" : "Why this answer is correct"}
                   </h3>
                   <QuestionContent text={q.explanation} />
-                </div>
+                </div>}
               </article>
             );
           })}

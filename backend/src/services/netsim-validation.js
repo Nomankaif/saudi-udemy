@@ -5,6 +5,7 @@ const fail = message => { throw new ApiError(400, message); };
 const ipv4 = v => typeof v === "string" && isIP(v) === 4;
 const cidr = v => typeof v === "string" && v.split("/").length === 2 && ipv4(v.split("/")[0]) && /^\d{1,2}$/.test(v.split("/")[1]) && Number(v.split("/")[1]) <= 32;
 const extraTypes = ["interface_ipv6", "vlan_name", "voice_vlan", "native_vlan", "allowed_vlans", "channel_group", "lldp_neighbor", "lldp_transmit", "lldp_receive", "cdp_enable", "ospf_process", "ospf_router_id", "ospf_priority", "ospf_interface", "ospf_network", "ospf_neighbor", "ospf_dr"];
+export const SUPPORTED_NETSIM_RULE_TYPES = ["vlan", "access_vlan", "trunk", "interface_up", "interface_ip", "static_route", "route", "ospf_route", "saved", "ping", "config", ...extraTypes];
 const extraInterfaces = ["interface_ipv6", "voice_vlan", "native_vlan", "allowed_vlans", "channel_group", "lldp_neighbor", "lldp_transmit", "lldp_receive", "cdp_enable", "ospf_priority", "ospf_interface", "ospf_dr"];
 export function validateNetDefinition(input, devices, text) {
   if (!devices.some(d => d.console !== false)) fail("Allow console access to at least one device");
@@ -36,11 +37,13 @@ export function validateNetDefinition(input, devices, text) {
     const dev = deviceMap.get(t.device);
     if (!dev) fail(`Task ${index + 1}: select a device`);
     if (!Number.isInteger(t.points) || t.points < 1 || t.points > 100) fail(`Task ${index + 1}: points must be 1–100`);
-    if (!Array.isArray(t.rules) || !t.rules.length || t.rules.length > 10) fail(`Task ${index + 1}: add 1–10 grading rules`);
-    const rules = t.rules.map(rule => {
+    if (t.rules !== undefined && !Array.isArray(t.rules)) fail(`Task ${index + 1}: grading checks must be a list`);
+    if ((t.rules?.length || 0) > 10) fail(`Task ${index + 1}: use at most 10 additional checks`);
+    if (!String(t.hint || "").trim() && !(t.rules?.length)) fail(`Task ${index + 1}: add a reference solution or an explicit check`);
+    const rules = (t.rules || []).map(rule => {
       if (!rule || typeof rule !== "object") fail("Invalid grading rule");
       const { type } = rule;
-      if (!["vlan", "access_vlan", "trunk", "interface_up", "interface_ip", "static_route", "route", "ospf_route", "saved", "ping", "config", ...extraTypes].includes(type)) fail("Unknown grading rule");
+      if (!SUPPORTED_NETSIM_RULE_TYPES.includes(type)) fail("Unknown grading rule");
       const value = text(rule.value || "", "expected value", 300, false);
       const iface = rule.interface || "";
       if (iface && !Object.hasOwn(dev.interfaces, iface)) fail(`${dev.name}: grading interface does not exist`);

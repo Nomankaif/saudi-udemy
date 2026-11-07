@@ -77,5 +77,16 @@ export function publicLab(lab) {
   return { title, category, subcategory: lab.subcategory || "", instructions, topology, engine: lab.engine || "legacy", links: lab.links, diagram: lab.engine === "netsim-v1" ? renderLabTopology(lab) : renderTopologySVG({ devices, topology }, "light"), devices: devices.map(({ initialConfig, ...d }) => d), tasks: tasks.map(({ id, text, device, points }) => ({ id, text, device, points })), access, examId, durationMinutes };
 }
 export function presentAttempt(a) {
+  if (a.snapshot.engine === "netsim-series-v1") {
+    const index = a.currentExercise || 0;
+    const exercise = a.snapshot.exercises[index];
+    return { _id: a._id, labId: a.labId, lab: publicLab(exercise), mode: a.mode, status: a.status, deadline: a.deadline,
+      solutionViewed: a.solutionViewed, transcript: a.states.transcripts[index] || [], prompts: a.states.exercises[index]?.prompts || {},
+      result: a.status === "SUBMITTED" ? a.result?.exercises?.[index] : undefined,
+      seriesResult: a.status === "SUBMITTED" ? { score: a.result.score, correct: a.result.correct, total: a.result.total } : undefined,
+      series: { title: a.snapshot.title, index, total: a.snapshot.exercises.length, questions: a.snapshot.exercises.map(lab => lab.title),
+        answered: a.snapshot.exercises.map((_, number) => Boolean(a.states.exercises[number]?.journal?.length || a.states.transcripts[number]?.length)),
+        passed: a.status === "SUBMITTED" ? a.result.exercises.map(result => result.correct === result.total) : undefined } };
+  }
   return { _id: a._id, labId: a.labId, lab: publicLab(a.snapshot), mode: a.mode, status: a.status, deadline: a.deadline, solutionViewed: a.solutionViewed, transcript: a.transcript, prompts: a.snapshot.engine === "netsim-v1" ? a.states.prompts : Object.fromEntries(Object.entries(a.states).map(([name, state]) => [name, getPrompt(state)])), result: a.status === "SUBMITTED" ? a.result : undefined };
 }

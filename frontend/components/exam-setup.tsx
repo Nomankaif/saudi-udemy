@@ -55,14 +55,14 @@ export function ExamSetup({ exam }: { exam: ExamSummary }) {
               id: "PRACTICE",
               title: "Practice & understand",
               description:
-                "Learn at your pace. Reveal answers and explanations whenever you need them.",
+                "Learn at your pace. Reveal answers and any available explanations whenever you need them.",
               Icon: BookOpen,
             },
             {
               id: "TIMED",
               title: "Simulate the exam",
               description:
-                "A focused timed session. Answers and explanations unlock after you submit.",
+                "A focused timed session. Answer review unlocks after you submit.",
               Icon: Timer,
             },
           ].map(({ id, title, description, Icon }) => (

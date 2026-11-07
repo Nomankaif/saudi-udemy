@@ -1,1 +1,129 @@
 @import "tailwindcss";
+@import "./portal.css";
+
+:root {
+  --site-blue-50: #edf6fb;
+  --site-blue-100: #dcecf5;
+  --site-blue-200: #b8d7e9;
+  --site-blue-300: #8abbd5;
+  --site-blue-400: #5395ba;
+  --site-blue-500: #24739d;
+  --site-blue-700: #0d537f;
+  --site-blue-800: #0c4673;
+  --site-blue-900: #0b3157;
+  --site-blue-950: #082643;
+  --site-gold-300: #f9d982;
+  --site-gold-500: #f0c75e;
+  --site-gold-700: #946a14;
+  --site-gold-50: #fffcf3;
+  --site-gold-100: #fff4d6;
+  --site-gold-border: #e8d298;
+  --site-gold-star: #e5b848;
+  --site-gold-star-stroke: #ad8220;
+  --site-ink: #142d48;
+  --site-muted: #607089;
+  --site-muted-strong: #4b5e77;
+  --site-border: #dfe5ee;
+  --site-border-soft: #e3e8ef;
+  --site-blue-border: #9db4d3;
+  --site-blue-line: #0c3b67;
+  --site-surface: #ffffff;
+  --site-surface-soft: #f6f8fb;
+  --site-surface-blue: #f3f8fc;
+  --site-surface-subtle: #f8fafc;
+  --site-on-dark: #d7e3ef;
+  --site-on-dark-bright: #e1edfa;
+  --site-on-dark-muted: #b9cadc;
+  --site-footer-muted: #a2b6cd;
+  --site-slate-100: #edf1f6;
+  --site-slate-300: #c5cfdd;
+  --site-slate-400: #8392a8;
+  --site-slate-700: #364b65;
+  --site-slate-800: #233a54;
+  --site-slate-950: #0e2138;
+  --site-hero-background: linear-gradient(112deg,var(--site-blue-700) 0%,var(--site-blue-800) 45%,var(--site-blue-900) 100%);
+}
+
+.drag-drop-question {
+  color: var(--site-ink);
+}
+.drag-drop-count {
+  color: var(--site-blue-900);
+  background: var(--site-gold-100);
+  border: 1px solid var(--site-gold-border);
+}
+.drag-drop-bank {
+  min-height: 120px;
+  background: var(--site-surface);
+}
+.drag-drop-column-heading {
+  margin: 0 0 12px;
+  color: var(--site-blue-900);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.drag-drop-target {
+  min-height: 56px;
+  background: var(--site-gold-100);
+  border-color: var(--site-gold-border);
+  border-radius: 2px;
+}
+.drag-drop-bank[data-over="true"] {
+  background: var(--site-blue-50);
+  outline: 2px solid var(--site-blue-500);
+  outline-offset: 4px;
+}
+.drag-drop-target[data-over="true"] {
+  background: var(--site-gold-50);
+  border-color: var(--site-blue-700);
+  box-shadow: 0 0 0 2px var(--site-blue-100);
+}
+.drag-drop-target h4 {
+  color: var(--site-blue-900);
+}
+.drag-drop-item {
+  min-height: 56px;
+  color: var(--site-ink);
+  background: var(--site-blue-100);
+  border-color: var(--site-blue-300);
+  border-radius: 2px;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.drag-drop-target .drag-drop-item {
+  min-height: 42px;
+  background: var(--site-blue-50);
+}
+.drag-drop-item:hover {
+  border-color: var(--site-blue-500);
+}
+.drag-drop-item[data-selected="true"] {
+  background: var(--site-gold-50);
+  border-color: var(--site-blue-700);
+  box-shadow: 0 0 0 2px var(--site-gold-100);
+}
+.drag-drop-grip,
+.drag-drop-link {
+  color: var(--site-blue-700);
+}
+.drag-drop-link:hover {
+  color: var(--site-blue-900);
+}
+.drag-drop-empty {
+  color: var(--site-gold-700);
+}
+.drag-drop-place {
+  color: var(--site-blue-800);
+  background: var(--site-surface);
+  border-color: var(--site-gold-border);
+  border-radius: 2px;
+}
+.drag-drop-place:not(:disabled):hover {
+  background: var(--site-blue-50);
+  border-color: var(--site-blue-700);
+}
+.drag-drop-review thead {
+  color: var(--site-blue-900);
+  background: var(--site-blue-50);
+}

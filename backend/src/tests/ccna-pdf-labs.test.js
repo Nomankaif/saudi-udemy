@@ -65,6 +65,43 @@ test("CCNA definitions validate new checks and retain route distance and private
 });
 function portName() { return "Ethernet0/0"; }
 
+test("reference-only grading accepts equivalent CLI and ignores unrelated settings", { timeout: 30000 }, async () => {
+  const definition = structuredClone(CCNA_PDF_LABS[0].definition);
+  definition.tasks[0].rules = [];
+  const lab = validateLab(definition);
+  const target = lab.tasks[0];
+  assert.equal((await simulate(lab, {}, "grade")).tasks[0].passed, false);
+  const correct = [...solution(lab), ...commands("SW-1", "enable\nconfigure terminal\nhostname Practice-SW\nend")];
+  assert.equal((await simulate(lab, { journal: correct }, "grade")).tasks[0].passed, true);
+  const equivalent = solution(lab).map(entry => entry.device === "SW-1" && entry.command === "interface e0/0"
+    ? { ...entry, command: "interface Ethernet0/0" } : entry);
+  assert.equal((await simulate(lab, { journal: equivalent }, "grade")).tasks[0].passed, true);
+  const wrong = solution(lab).map(entry => entry.command === "switchport trunk allowed vlan 5,6"
+    ? { ...entry, command: "switchport trunk allowed vlan 5,7" } : entry);
+  assert.equal((await simulate(lab, { journal: wrong }, "grade")).tasks[0].passed, false);
+  assert.equal(target.rules.length, 0);
+});
+
+test("reference grading scopes repeated commands to the intended interface", { timeout: 30000 }, async () => {
+  const definition = structuredClone(CCNA_PDF_LABS[0].definition);
+  definition.devices.find(device => device.name === "SW-1").interfaces["Ethernet0/0"].status = "administratively down";
+  definition.tasks = [{ id: 1, device: "SW-1", text: "Enable Ethernet0/0", hint: "enable\nconfigure terminal\ninterface e0/0\nno shutdown\nend", points: 10, rules: [] }];
+  const lab = validateLab(definition);
+  assert.equal((await simulate(lab, {}, "grade")).score, 0);
+  const wrongPort = commands("SW-1", "enable\nconfigure terminal\ninterface e0/1\nno shutdown\nend");
+  assert.equal((await simulate(lab, { journal: wrongPort }, "grade")).score, 0);
+  const correctPort = commands("SW-1", "enable\nconfigure terminal\ninterface Ethernet0/0\nno shutdown\nend");
+  assert.equal((await simulate(lab, { journal: correctPort }, "grade")).score, 100);
+});
+
+test("a no-op reference cannot publish a task without an outcome check", { timeout: 30000 }, async () => {
+  const definition = structuredClone(CCNA_PDF_LABS[0].definition);
+  definition.tasks = [{ id: 1, device: "SW-1", text: "Configure the trunk", hint: "enable\nconfigure terminal\ninterface e0/0\nswitchport mode trunk\nend", points: 10, rules: [] }];
+  const report = await simulate(validateLab(definition), {}, "validate");
+  assert.equal(report.valid, false);
+  assert.match(report.errors.join(" "), /no graded configuration change/);
+});
+
 test("CCNA packet behavior: allowed VLANs, failed negotiation and floating-route failover", { timeout: 30000 }, async () => {
   const lab = getLab(7), journal = solution(lab);
   const ping = async (definition, entries, device, destination) => (await simulate(definition, { journal: entries }, "command", { device, command: `ping ${destination}` })).output;

@@ -1,5 +1,6 @@
 export type CategoryOption = { name: string; subcategories: { name: string }[] };
 export interface ExamSummary {
+  kind?: "EXAM" | "DRAG_DROP";
   id: string;
   slug: string;
   title: string;
@@ -28,7 +29,7 @@ export interface Question {
   correctPlacements?: Placement[];
   _id?: string; text: string; options: { id: string; text: string }[]; correctOptionIds: string[];
   explanation: string; accessLevel: "FREE" | "PREMIUM"; topic: string; difficulty: string; imageUrl: string; displayOrder: number;
-  errors?: string[]; duplicate?: boolean; row?: number;
+  errors?: string[]; sourceErrors?: string[]; importErrors?: string[]; importWarnings?: string[]; duplicate?: boolean; duplicateSourceNumber?: boolean; row?: number; sourceNumber?: number; sourcePage?: number;
 }
 export type PbqField = { id: string; label: string; kind: "text" | "textarea" | "select" | "radio" | "checkbox" | "match"; tabId?: string; points: number; caseSensitive: boolean; evidence: string; options: { id: string; text: string }[] };
 export type PbqArea = Omit<PbqField, "kind" | "tabId"> & { kind: PbqField["kind"] | "evidence" | "form"; x: number; y: number; width?: number; height?: number; marker?: "none" | "question"; tabs?: { id: string; label: string }[]; fields?: PbqField[] };

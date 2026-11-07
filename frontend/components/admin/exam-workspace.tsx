@@ -6,12 +6,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Search, Copy, Trash2, Send, ArrowLeft } from "lucide-react";
 import { api, messageOf, questionIssuesOf, type QuestionIssue } from "@/lib/api";
 import type { AdminExam, Question } from "@/lib/types";
-import { AdminHeading, inputClass, primaryButton, secondaryButton } from "./ui";
+import { inputClass, primaryButton, secondaryButton } from "./ui";
 import { QuestionEditor, blankQuestion } from "./question-editor";
 import { ImportQuestions } from "./import-questions";
 import { CategoryFields } from "./category-fields";
 
 export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; initialTab?: string }) {
+  const router = useRouter();
   const [exam, setExam] = useState<AdminExam | null>(null),
     [questions, setQuestions] = useState<Question[]>([]),
     [total, setTotal] = useState(0),
@@ -19,7 +20,7 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
     [query, setQuery] = useState(""),
     [access, setAccess] = useState(""),
     [selected, setSelected] = useState<string[]>([]),
-    [editing, setEditing] = useState<Question>(blankQuestion),
+    [editing, setEditing] = useState<Question>(() => blankQuestion()),
     [editorKey, setEditorKey] = useState(0),
     [tab, setTab] = useState(initialTab),
     [message, setMessage] = useState(""),
@@ -77,8 +78,7 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
     setPublishIssues([]);
     try {
       await api(`/exams/${id}/publish`, { method: "POST" });
-      await load();
-      setMessage("Exam published. Students can now see this release.");
+      router.push("/admin/exams");
     } catch (error) {
       const issues = questionIssuesOf(error);
       setPublishIssues(issues);
@@ -115,7 +115,7 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
     }
   }
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1540px] space-y-6">
       <Link
         href="/admin/exams"
         className="inline-flex items-center gap-2 text-sm font-bold text-slate-500"
@@ -123,11 +123,21 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
         <ArrowLeft size={16} />
         All exams
       </Link>
-      <AdminHeading
-        eyebrow="Exam studio"
-        title={exam?.title || "Loading exam…"}
-        description={`${exam?.draftCount || 0} draft questions · ${exam?.draftFree || 0} free · ${exam?.status || "DRAFT"}${exam?.hasUnpublishedChanges ? " · Unpublished changes" : ""}`}
-        action={
+      <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-700">Exam studio</p>
+          <h1 className="mt-2 break-words text-3xl font-bold tracking-tight text-slate-950">{exam?.title || "Loading exam…"}</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
+            <span><strong className="font-semibold text-slate-900">{exam?.draftCount || 0}</strong> draft questions</span>
+            <span><strong className="font-semibold text-slate-900">{exam?.draftFree || 0}</strong> free</span>
+            <span className="inline-flex items-center gap-1.5"><span className={`size-2 rounded-full ${exam?.status === "PUBLISHED" ? "bg-emerald-500" : "bg-slate-400"}`} />{exam?.status === "PUBLISHED" ? "Published" : "Draft"}</span>
+            {exam?.hasUnpublishedChanges && <span className="font-medium text-amber-700">Unpublished changes</span>}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          {exam?.status === "PUBLISHED" && (
+            <Link target="_blank" href={`/exams/${exam.slug}`} className="text-sm font-semibold text-violet-700 hover:underline">View live exam ↗</Link>
+          )}
           <button
             disabled={busy || !exam}
             className={`${primaryButton} rounded-lg disabled:opacity-40`}
@@ -136,27 +146,38 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
             <Send size={16} />
             Publish exam
           </button>
-        }
-      />
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-4">
+        </div>
+      </header>
+      <div role="tablist" aria-label="Exam workspace sections" className="flex border-b border-slate-300">
         {["questions", "import", "settings"].map((value) => (
           <button
             key={value}
-            className={`rounded-lg px-5 py-2.5 text-sm font-bold capitalize ${tab === value ? "bg-slate-900 text-white" : "bg-white text-slate-500"}`}
+            type="button"
+            id={`exam-tab-${value}`}
+            role="tab"
+            aria-selected={tab === value}
+            aria-controls={`exam-panel-${value}`}
+            tabIndex={tab === value ? 0 : -1}
+            className={`-mb-px min-w-0 flex-1 border-b-[3px] px-3 py-3 text-center text-sm font-semibold capitalize transition-colors sm:flex-none sm:min-w-36 sm:px-6 ${tab === value ? "border-violet-700 text-slate-950" : "border-transparent text-slate-500 hover:border-slate-400 hover:text-slate-900"}`}
             onClick={() => setTab(value)}
+            onKeyDown={(event) => {
+              const tabs = ["questions", "import", "settings"];
+              const index = tabs.indexOf(value);
+              const next = event.key === "ArrowRight" ? tabs[(index + 1) % tabs.length]
+                : event.key === "ArrowLeft" ? tabs[(index + tabs.length - 1) % tabs.length]
+                : event.key === "Home" ? tabs[0]
+                : event.key === "End" ? tabs[tabs.length - 1]
+                : null;
+              if (next) {
+                event.preventDefault();
+                setTab(next);
+                document.getElementById(`exam-tab-${next}`)?.focus();
+              }
+            }}
           >
             {value}
           </button>
         ))}
-        {exam?.status === "PUBLISHED" && (
-          <Link
-            target="_blank"
-            href={`/exams/${exam.slug}`}
-            className="ml-auto text-sm font-bold text-violet-700"
-          >
-            View live exam ↗
-          </Link>
-        )}
       </div>
       {message && (
         <p
@@ -181,8 +202,12 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
         </section>
       )}
       {tab === "questions" && (
-        <div className="grid items-start gap-6 xl:grid-cols-[320px_1fr]">
-          <aside className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div id="exam-panel-questions" role="tabpanel" aria-labelledby="exam-tab-questions" className="grid items-start gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-baseline justify-between gap-2">
+              <h2 className="text-sm font-bold text-slate-950">Question bank</h2>
+              <span className="text-xs text-slate-500">{exam?.draftCount || 0} total</span>
+            </div>
             <button
               className={`${primaryButton} w-full rounded-lg`}
               onClick={() => edit(blankQuestion())}
@@ -190,7 +215,7 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
               <Plus size={17} />
               New question
             </button>
-            <label className="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 px-3">
+            {Boolean(exam?.draftCount) && <label className="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 px-3">
               <Search size={16} className="text-slate-400" />
               <input
                 aria-label="Search question bank"
@@ -202,8 +227,8 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
                 placeholder="Search questions"
                 className="min-w-0 flex-1 py-3 text-sm outline-none"
               />
-            </label>
-            <select
+            </label>}
+            {Boolean(exam?.draftCount) && <select
               aria-label="Filter access"
               className={`${inputClass} mt-3 w-full rounded-lg`}
               value={access}
@@ -215,8 +240,8 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
               <option value="">All access levels</option>
               <option value="FREE">Free</option>
               <option value="PREMIUM">Premium</option>
-            </select>
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+            </select>}
+            {questions.length > 0 && <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
               <label className="flex gap-1">
                 <input
                   type="checkbox"
@@ -231,25 +256,23 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
                 />
                 Page
               </label>
-              <button
-                disabled={!selected.length}
-                className="rounded bg-emerald-50 px-2 py-1 font-bold text-emerald-700 disabled:opacity-40"
+              {selected.length > 0 && <><button
+                className="rounded bg-emerald-50 px-2 py-1 font-bold text-emerald-700"
                 onClick={() => void bulk("FREE")}
               >
                 Make free
               </button>
               <button
-                disabled={!selected.length}
-                className="rounded bg-violet-50 px-2 py-1 font-bold text-violet-700 disabled:opacity-40"
+                className="rounded bg-violet-50 px-2 py-1 font-bold text-violet-700"
                 onClick={() => void bulk("PREMIUM")}
               >
                 Make premium
-              </button>
-            </div>
-            <div className="mt-4 max-h-[640px] space-y-2 overflow-y-auto">
+              </button></>}
+            </div>}
+            <div className="mt-4 max-h-[640px] space-y-1 overflow-y-auto">
               {questions.map((q) => (
                 <div
-                  className={`rounded-xl border p-3 ${editing._id === q._id ? "border-violet-300 bg-violet-50" : "border-slate-100"}`}
+                  className={`rounded-lg border p-3 ${editing._id === q._id ? "border-violet-300 bg-violet-50" : "border-transparent hover:border-slate-200 hover:bg-slate-50"}`}
                   key={q._id}
                 >
                   <div className="flex items-start gap-2">
@@ -277,7 +300,7 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
                       </span>
                     </button>
                   </div>
-                  <div className="mt-2 flex justify-end gap-3">
+                  <div className="mt-1 flex justify-end gap-3">
                     <button
                       aria-label="Duplicate question"
                       className="p-1 text-slate-500"
@@ -297,13 +320,12 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
                   </div>
                 </div>
               ))}
-              {!questions.length && (
-                <p className="p-5 text-center text-sm text-slate-500">
-                  No questions yet. Add one or import a file.
-                </p>
-              )}
+              {!questions.length && <div className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-600">
+                {exam?.draftCount ? "No questions match these filters." : "No questions in this exam yet."}
+                {!exam?.draftCount && <button type="button" className="mt-2 block w-full font-semibold text-violet-700 hover:underline" onClick={() => setTab("import")}>Import questions</button>}
+              </div>}
             </div>
-            <div className="mt-4 flex justify-between text-sm">
+            {total > 25 && <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-sm">
               <button
                 disabled={page === 1}
                 onClick={() => setPage(page - 1)}
@@ -321,7 +343,7 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
               >
                 Next →
               </button>
-            </div>
+            </div>}
           </aside>
           <QuestionEditor
             key={editorKey}
@@ -329,20 +351,23 @@ export function ExamWorkspace({ id, initialTab = "questions" }: { id: string; in
             onSave={save}
             busy={busy}
             message={message}
+            fixedType={editing.type === "DRAG_DROP" || editing.type === "IMAGE_PBQ" ? editing.type : undefined}
           />
         </div>
       )}
       {tab === "import" && (
-        <ImportQuestions examId={id} onImported={() => void load()} />
+        <div id="exam-panel-import" role="tabpanel" aria-labelledby="exam-tab-import"><ImportQuestions examId={id} onImported={() => void load()} /></div>
       )}
       {tab === "settings" && exam && (
-        <ExamSettings
-          initial={exam}
-          onSaved={async () => {
-            await load();
-            setMessage("Settings saved.");
-          }}
-        />
+        <div id="exam-panel-settings" role="tabpanel" aria-labelledby="exam-tab-settings">
+          <ExamSettings
+            initial={exam}
+            onSaved={async () => {
+              await load();
+              setMessage("Settings saved.");
+            }}
+          />
+        </div>
       )}
     </div>
   );

@@ -13,6 +13,7 @@ const schema = new mongoose.Schema({
   transcript: { type: [mongoose.Schema.Types.Mixed], default: [] },
   result: mongoose.Schema.Types.Mixed,
   revision: { type: Number, default: 0 },
+  currentExercise: { type: Number, default: 0 },
 }, { timestamps: true, minimize: false });
 schema.index({ status: 1, deadline: 1 });
 export default mongoose.model("LabAttempt", schema);

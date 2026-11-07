@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const examSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   slug: { type: String, required: true, unique: true, trim: true, index: true },
+  sourceKind: { type: String, enum: ["STANDARD", "DRAG_DROP_BANK"], default: "STANDARD", index: true },
   shortDescription: { type: String, required: true },
   description: { type: String, default: "" },
   imageUrl: String,

@@ -7,15 +7,18 @@ export function normalizeQuestion(input = {}) {
   const pbq = input.type === "IMAGE_PBQ";
   const pbqData = pbq ? normalizePbq(input.pbq, input.pbqKey || []) : { pbq: null, pbqKey: [] };
   const drag = input.type === "DRAG_DROP";
+  const choiceOptions = Array.isArray(input.options) && input.options.length
+    ? input.options
+    : Array.from({ length: 4 }, () => ({ text: "" }));
   if (drag && (!Array.isArray(input.options) || input.options.length > 20 || !Array.isArray(input.dropTargets) || input.dropTargets.length > 10 || !Array.isArray(input.correctPlacements) || input.correctPlacements.length > 20))
     throw new ApiError(400, "Use up to 20 items, 10 groups and 20 answer placements");
   return {
     type: pbq ? "IMAGE_PBQ" : drag ? "DRAG_DROP" : input.type === "MULTIPLE_CHOICE" ? "MULTIPLE_CHOICE" : "SINGLE_CHOICE",
     ...pbqData,
     text: string(input.text),
-    options: pbq ? [] : drag ? input.options.map(i => ({ id: string(i?.id), text: string(i?.text) })) : ["A", "B", "C", "D"].map((id, i) => ({
-      id,
-      text: string(input.options?.[i]?.text),
+    options: pbq ? [] : drag ? input.options.map(i => ({ id: string(i?.id), text: string(i?.text) })) : choiceOptions.map((option, i) => ({
+      id: String.fromCharCode(65 + i),
+      text: string(option?.text),
     })),
     correctOptionIds: !pbq && !drag && Array.isArray(input.correctOptionIds)
       ? input.correctOptionIds.map(string)
@@ -23,7 +26,7 @@ export function normalizeQuestion(input = {}) {
     dropTargets: drag ? input.dropTargets.map(t => ({ id: string(t?.id), label: string(t?.label), capacity: Number(t?.capacity ?? 1) })) : [],
     correctPlacements: drag ? input.correctPlacements.map(p => ({ itemId: string(p?.itemId), targetId: string(p?.targetId) })) : [],
     explanation: string(input.explanation),
-    accessLevel: string(input.accessLevel) || "PREMIUM",
+    accessLevel: string(input.accessLevel) || "FREE",
     topic: string(input.topic) || "General",
     difficulty: string(input.difficulty) || "MEDIUM",
     imageUrl: string(input.imageUrl),
@@ -42,22 +45,22 @@ export function questionErrors(question) {
   else if (question.type === "DRAG_DROP") errors.push(...dragDropErrors(question));
   else {
   if (
-    question.options?.length !== 4 ||
-    question.options.some((option) => !option.text?.trim())
+    !Array.isArray(question.options) ||
+    question.options.length < 2 || question.options.length > 8 ||
+    question.options.some((option, index) => option.id !== String.fromCharCode(65 + index) || !option.text?.trim())
   )
-    errors.push("Four non-empty options are required");
+    errors.push("Two to eight non-empty, consecutive options (A–H) are required");
   const keys = question.correctOptionIds;
   const multiple = question.type === "MULTIPLE_CHOICE";
+  const validIds = new Set((question.options || []).map(option => option.id));
   if (
     !Array.isArray(keys) ||
-    (multiple ? keys.length < 2 || keys.length > 4 : keys.length !== 1) ||
+    (multiple ? keys.length < 2 || keys.length > validIds.size : keys.length !== 1) ||
     new Set(keys).size !== keys.length ||
-    keys.some(id => !["A", "B", "C", "D"].includes(id))
+    keys.some(id => !validIds.has(id))
   )
-    errors.push(multiple ? "Select two to four different correct answers (A–D)" : "Select exactly one correct answer (A–D)");
+    errors.push(multiple ? "Select two or more different correct answers from the available options" : "Select exactly one correct answer from the available options");
   }
-  if (!question.explanation?.trim())
-    errors.push("Answer explanation is required");
   if (!["FREE", "PREMIUM"].includes(question.accessLevel))
     errors.push("Access must be FREE or PREMIUM");
   if (!["EASY", "MEDIUM", "HARD"].includes(question.difficulty))
@@ -69,6 +72,9 @@ export function questionErrors(question) {
   )
     errors.push("Use an HTTP image URL or uploaded image");
   return errors;
+}
+export function importDraftErrors(question) {
+  return questionErrors(question);
 }
 export const duplicateKey = (text) =>
   text.trim().toLowerCase().replace(/\s+/g, " ");

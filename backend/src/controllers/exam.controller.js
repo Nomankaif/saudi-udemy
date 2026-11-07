@@ -44,7 +44,7 @@ export async function listPublicExams(request, response) {
   );
 }
 export async function listAdminExams(request, response) {
-  response.json(await Exam.find({ status: { $ne: "ARCHIVED" } }).sort({ createdAt: -1 }).lean());
+  response.json(await Exam.find({ status: { $ne: "ARCHIVED" }, sourceKind: { $ne: "DRAG_DROP_BANK" } }).sort({ createdAt: -1 }).lean());
 }
 export async function deleteExam(request, response) {
   const exam = await Exam.findByIdAndUpdate(request.params.id, { $set: { status: "ARCHIVED" } }, { new: true });

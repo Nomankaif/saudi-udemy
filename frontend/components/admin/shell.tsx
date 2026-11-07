@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   BarChart3,
   BookOpen,
+  Boxes,
   ChevronDown,
   FileQuestion,
   Flag,
@@ -10,6 +11,9 @@ import {
   LayoutDashboard,
   Menu,
   Newspaper,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Puzzle,
   Settings,
   ShieldCheck,
   Users,
@@ -20,12 +24,14 @@ import { useState } from "react";
 const links = [
   ["/admin", "Overview", LayoutDashboard],
   ["/admin/exams", "Exams", BookOpen],
+  ["/admin/drag-drop", "Drag and drop", Boxes],
+  ["/admin/performance-based", "Performance-based", Puzzle],
   ["/admin/labs", "Labs", FileQuestion],
   ["/admin/categories", "Categories", LayoutDashboard],
   ["/admin/questions", "Question banks", FileQuestion],
   ["/admin/access-requests", "Access requests", ShieldCheck],
   ["/admin/users", "Users & admins", Users],
-  ["/admin/banners", "Banners", ImageIcon],
+  ["/admin/banners", "Notifications", ImageIcon],
   ["/admin/content", "CMS & articles", Newspaper],
   ["/admin/reports", "Results & reports", BarChart3],
   ["/admin/settings", "Settings", Settings],
@@ -33,19 +39,30 @@ const links = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-slate-950 text-white transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-slate-950 text-white transition-[width,transform] duration-200 lg:translate-x-0 ${collapsed ? "lg:w-20" : "lg:w-72"} ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <div className="flex h-20 items-center gap-3 border-b border-slate-800 px-6">
-          <span className="flex size-10 items-center justify-center bg-violet-600 text-xl font-black">
+        <div className={`flex h-20 items-center gap-3 border-b border-slate-800 px-6 ${collapsed ? "lg:flex-col lg:justify-center lg:gap-1 lg:px-2" : ""}`}>
+          <span className={`flex size-10 shrink-0 items-center justify-center bg-violet-600 text-xl font-black ${collapsed ? "lg:size-8 lg:text-lg" : ""}`}>
             C
           </span>
-          <div className="flex flex-col font-extrabold">
+          <div className={`flex flex-col font-extrabold ${collapsed ? "lg:sr-only" : ""}`}>
             Certify
             <small className="font-normal text-slate-400">Administration</small>
           </div>
+          <button
+            type="button"
+            className={`ml-auto hidden shrink-0 rounded-md p-1.5 text-slate-300 transition hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400 lg:inline-flex ${collapsed ? "lg:ml-0" : ""}`}
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
+          </button>
           <button
             className="ml-auto p-2 lg:hidden"
             onClick={() => setOpen(false)}
@@ -54,22 +71,28 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <X />
           </button>
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-          {links.map(([href, label, Icon]) => (
+        <nav className={`flex-1 space-y-1 overflow-y-auto p-4 ${collapsed ? "lg:px-2" : ""}`} aria-label="Administration">
+          {links.map(([href, label, Icon]) => {
+            const active = path === href || (href !== "/admin" && path.startsWith(`${href}/`));
+            return (
             <Link
-              className={`flex items-center gap-3 px-4 py-3 text-sm font-semibold transition ${path === href || (href !== "/admin" && path.startsWith(`${href}/`)) ? "bg-violet-600 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}
+              className={`flex items-center gap-3 px-4 py-3 text-sm font-semibold transition ${collapsed ? "lg:justify-center lg:px-0" : ""} ${active ? "bg-violet-600 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}
               href={href}
               key={href}
               onClick={() => setOpen(false)}
+              aria-current={active ? "page" : undefined}
+              aria-label={label}
+              title={collapsed ? label : undefined}
             >
-              <Icon size={19} />
-              {label}
+              <Icon size={19} className="shrink-0" />
+              <span className={collapsed ? "lg:sr-only" : ""}>{label}</span>
             </Link>
-          ))}
+          );
+          })}
         </nav>
-        <div className="flex items-center gap-3 border-t border-slate-800 p-5 text-sm">
-          <Flag size={20} />
-          <span className="flex flex-col font-bold">
+        <div className={`flex items-center gap-3 border-t border-slate-800 p-5 text-sm ${collapsed ? "lg:justify-center lg:px-2" : ""}`}>
+          <Flag size={20} className="shrink-0" />
+          <span className={`flex flex-col font-bold ${collapsed ? "lg:sr-only" : ""}`}>
             English
           </span>
         </div>
@@ -81,7 +104,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           aria-label="Close overlay"
         />
       )}
-      <div className="min-h-screen lg:pl-72">
+      <div className={`min-h-screen transition-[padding-left] duration-200 ${collapsed ? "lg:pl-20" : "lg:pl-72"}`}>
         <header className="sticky top-0 z-30 flex h-20 items-center border-b border-slate-200 bg-white px-5 sm:px-8">
           <button
             className="mr-4 p-2 lg:hidden"

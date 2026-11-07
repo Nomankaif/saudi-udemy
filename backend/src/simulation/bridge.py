@@ -385,6 +385,37 @@ def check_rule(net, consoles, device, rule):
     return False
 
 
+def config_lines(console):
+    """Stable simulator configuration, independent of CLI spelling and line order."""
+    lines, scope = set(), "global"
+    for line in console.running().splitlines():
+        if line.strip() == "!":
+            scope = "global"
+            continue
+        canonical = " ".join(line.lower().split())
+        if not canonical:
+            continue
+        if not line[0].isspace():
+            scope = canonical if canonical.startswith(("interface ", "vlan ", "router ", "ip dhcp pool ", "ip access-list ")) else "global"
+        lines.add(f"{scope}: {canonical}")
+    return lines
+
+
+def reference_changes(lab):
+    """Collect only the configuration each reference task changes on its device."""
+    _, consoles = build(lab)
+    changes = []
+    for task in lab["tasks"]:
+        cli = consoles[task["device"]]
+        before = config_lines(cli)
+        for line in task.get("hint", "").splitlines():
+            if line.strip() and line.strip() != "!":
+                cli.execute(line)
+        after = config_lines(cli)
+        changes.append((after - before, before - after))
+    return changes
+
+
 def main(data):
     lab = data["lab"]
     net, consoles = build(lab)
@@ -403,6 +434,9 @@ def main(data):
                 if out.startswith("%"):
                     errors.append(f"Task {task['id']} ({task['device']}): {line}: {out}")
         if len(journal) > 2000: raise ValueError("Reference solutions exceed 2,000 commands")
+        for task, (added, removed) in zip(lab["tasks"], reference_changes(lab)):
+            if not added and not removed and not task["rules"]:
+                errors.append(f"Task {task['id']}: reference commands make no graded configuration change; add an outcome check if this task tests behavior")
         report = main({"lab": lab, "journal": journal, "operation": "grade"})
         return {"score": report["score"], "tasks": report["tasks"], "errors": errors, "valid": not errors and report["score"] == 100}
     if operation == "command":
@@ -415,12 +449,18 @@ def main(data):
         result = {"partial": line.split()[-1] if line and not line.endswith(" ") else "", "matches": [{"word": ln.strip().split()[0]} for ln in help_text.splitlines() if ln.strip() and not ln.startswith("%") and not ln.strip().startswith("<")]}
     if operation == "grade":
         tasks = []
-        for task in lab["tasks"]:
+        changes = reference_changes(lab)
+        for index, task in enumerate(lab["tasks"]):
             # Each task gets a fresh copy so a ping/DHCP check cannot change
             # the outcome of later configuration or save checks.
             task_net, task_consoles = build(lab)
             for entry in data.get("journal", []): task_consoles[entry["device"]].execute(entry["command"])
-            passed = all(check_rule(task_net, task_consoles, task["device"], r) for r in task["rules"])
+            added, removed = changes[index]
+            actual = config_lines(task_consoles[task["device"]])
+            has_reference = bool(added or removed)
+            matches_reference = added <= actual and not (removed & actual)
+            passed = (has_reference or bool(task["rules"])) and matches_reference and all(
+                check_rule(task_net, task_consoles, task["device"], r) for r in task["rules"])
             tasks.append({"id": task["id"], "device": task["device"], "text": task["text"], "passed": passed, "points": task["points"], "earned": task["points"] if passed else 0, "solution": task.get("hint", "")})
         possible = sum(t["points"] for t in tasks)
         earned = sum(t["earned"] for t in tasks)

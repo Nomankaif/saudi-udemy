@@ -32,7 +32,7 @@ export function CategoryMenu({ defaultKind = "exams", onNavigate }: { defaultKin
     <DropdownMenuTrigger openOnHover delay={120} className="inline-flex w-fit items-center gap-1.5 rounded-md outline-none hover:text-violet-600 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-4 data-popup-open:text-violet-700">
       Categories <ChevronDown size={14} aria-hidden="true" />
     </DropdownMenuTrigger>
-    <DropdownMenuContent aria-label="Browse categories" sideOffset={16}>
+    <DropdownMenuContent className="portal-theme" aria-label="Browse categories" sideOffset={16}>
       <DropdownMenuRadioGroup aria-label="Content type" value={kind} onValueChange={value => setKind(value as "exams" | "labs")} className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
         <DropdownMenuRadioItem value="exams"><BookOpen aria-hidden="true" />Exams</DropdownMenuRadioItem>
         <DropdownMenuRadioItem value="labs"><Network aria-hidden="true" />Labs</DropdownMenuRadioItem>
@@ -45,7 +45,7 @@ export function CategoryMenu({ defaultKind = "exams", onNavigate }: { defaultKin
         {categories?.length === 0 && <DropdownMenuItem disabled>No categories available yet</DropdownMenuItem>}
         {categories?.map(category => category.subcategories.length ? <DropdownMenuSub key={category.name}>
           <DropdownMenuSubTrigger className="min-w-0"><span className="truncate">{category.name}</span></DropdownMenuSubTrigger>
-          <DropdownMenuSubContent aria-label={`${category.name} subcategories`}>
+          <DropdownMenuSubContent className="portal-theme" aria-label={`${category.name} subcategories`}>
             <DropdownMenuGroup>
               {category.subcategories.map(child => <DropdownMenuLinkItem key={child.name} render={<Link href={href(category.name, child.name)} />} onClick={navigate} className="break-words">{child.name}</DropdownMenuLinkItem>)}
             </DropdownMenuGroup>

@@ -2,7 +2,9 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "node:path";
-import { storageRoot } from "./config/storage.js";
+import { cloudStorage, storageRoot } from "./config/storage.js";
+import { readMedia } from "./services/blob-store.js";
+import { asyncHandler } from "./utils/async-handler.js";
 import authRoutes from "./routes/auth.routes.js";
 import examRoutes from "./routes/exam.routes.js";
 import accessRequestRoutes from "./routes/access-request.routes.js";
@@ -12,6 +14,7 @@ import mediaRoutes from "./routes/media.routes.js";
 import reportRoutes from "./routes/report.routes.js";
 import categoryRoutes from "./routes/category.routes.js";
 import labRoutes from "./routes/lab.routes.js";
+import standalonePracticeRoutes from "./routes/standalone-practice.routes.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 import { createRequestLogger } from "./middleware/request-logger.middleware.js";
 
@@ -22,7 +25,12 @@ app.use(cors({ origin: [process.env.WEB_ORIGIN || "http://localhost:3000"], cred
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser());
-app.use("/uploads/media", express.static(path.join(storageRoot, "media"), { index: false, maxAge: "1d" }));
+if (cloudStorage) app.get("/uploads/media/:filename", asyncHandler(async (request, response) => {
+  const { buffer, contentType } = await readMedia(request.params.filename);
+  response.set({ "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" });
+  response.type(contentType).send(buffer);
+}));
+else app.use("/uploads/media", express.static(path.join(storageRoot, "media"), { index: false, maxAge: "1d" }));
 app.get("/api/health", (request, response) => response.json({ status: "ok" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/exams", examRoutes);
@@ -33,7 +41,9 @@ app.use("/api/media", mediaRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/labs", labRoutes);
+app.use("/api/practice-items", standalonePracticeRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
+
 
 export default app;

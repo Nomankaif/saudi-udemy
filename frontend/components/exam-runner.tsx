@@ -506,7 +506,7 @@ export function ExamRunner({ id }: { id: string }) {
                       className="mt-7 flex items-center gap-2 text-sm font-bold text-violet-700"
                     >
                       <Eye size={17} />
-                      Show answer & explanation
+                      Show answer
                     </button>
                   )}
                   {reveal && (
@@ -516,7 +516,7 @@ export function ExamRunner({ id }: { id: string }) {
                       </h3>
                       {question.type === "DRAG_DROP" && <div className="my-4"><DragDropReview items={question.options} targets={question.dropTargets || []} placements={answer?.placements || []} expected={reveal.correctPlacements || []} /></div>}
                       {question.type === "IMAGE_PBQ" && <PbqReview definition={question.pbq || {alt: "", areas: []}} expected={reveal.pbqKey || []} answers={answer?.pbqAnswers || []}/>}
-                      <QuestionContent text={reveal.explanation} />
+                      {reveal.explanation?.trim() && <QuestionContent text={reveal.explanation} />}
                     </div>
                   )}
                 </>
@@ -616,7 +616,7 @@ export function ExamRunner({ id }: { id: string }) {
             <p className="mt-4 leading-7 text-slate-500">
               You answered {answered} of {data?.attempt.questionCount}{" "}
               questions. {(data?.attempt.questionCount || 0) - answered} remain
-              unanswered. You can review your explanations after submission.
+              unanswered. You can review your answers after submission.
             </p>
             <div className="mt-7 flex gap-3">
               <button

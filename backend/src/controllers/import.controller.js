@@ -5,21 +5,21 @@ import Exam from "../models/exam.model.js";
 import Question from "../models/question.model.js";
 import { ApiError } from "../utils/api-error.js";
 import {
-  extractQuestions,
+  extractQuestionsWithReport,
   previewQuestions,
   templateHeaders,
   templateRow,
 } from "../services/import.service.js";
 import {
   normalizeQuestion,
-  questionErrors,
+  importDraftErrors,
 } from "../services/question-validation.js";
 export async function previewImport(request, response) {
   if (!request.file)
-    throw new ApiError(400, "Select an XLSX, CSV, DOCX or PDF file");
+    throw new ApiError(400, "Select an XLSX, CSV, DOCX, PDF or JSON file");
   if (!(await Exam.exists({ _id: request.params.id })))
     throw new ApiError(404, "Exam not found");
-  const questions = await extractQuestions(
+  const { questions, report } = await extractQuestionsWithReport(
     request.file.buffer,
     path.extname(request.file.originalname).toLowerCase(),
   );
@@ -34,6 +34,7 @@ export async function previewImport(request, response) {
       questions,
       existing.map((item) => item.text),
     ),
+    report,
     filename: request.file.originalname,
   });
 }
@@ -48,7 +49,7 @@ export async function commitImport(request, response) {
     throw new ApiError(404, "Exam not found");
   const questions = request.body.questions.map(normalizeQuestion);
   const invalid = questions.flatMap((question, index) =>
-    questionErrors(question).map((message) => `Row ${index + 1}: ${message}`),
+    importDraftErrors(question).map((message) => `Row ${index + 1}: ${message}`),
   );
   if (invalid.length) throw new ApiError(400, invalid.slice(0, 10).join("; "));
   const existing = await Question.find({
@@ -86,6 +87,23 @@ export async function commitImport(request, response) {
 }
 export async function downloadTemplate(request, response) {
   const format = request.params.format;
+  if (format === "json") {
+    response.attachment("question-template.json").json({
+      questions: [{
+        type: "SINGLE_CHOICE",
+        text: templateRow[0],
+        options: templateRow.slice(1, 5).map((text, index) => ({
+          id: String.fromCharCode(65 + index), text,
+        })),
+        correctOptionIds: ["A"],
+        explanation: templateRow[6],
+        accessLevel: "FREE",
+        topic: templateRow[8],
+        difficulty: templateRow[9],
+      }],
+    });
+    return;
+  }
   if (format === "docx") {
     const lines = [
       `Question 1: ${templateRow[0]}`,
@@ -125,5 +143,5 @@ export async function downloadTemplate(request, response) {
     response
       .attachment("question-template.xlsx")
       .send(await workbook.xlsx.writeBuffer());
-  else throw new ApiError(400, "Choose xlsx, csv or docx");
+  else throw new ApiError(400, "Choose xlsx, csv, docx or json");
 }

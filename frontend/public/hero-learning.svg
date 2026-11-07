@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 600" fill="none">
+  <defs>
+    <linearGradient id="panel" x1="126" y1="74" x2="607" y2="512" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#EAF2FC"/></linearGradient>
+    <linearGradient id="screen" x1="61" y1="391" x2="371" y2="545" gradientUnits="userSpaceOnUse"><stop stop-color="#173D65"/><stop offset="1" stop-color="#102A48"/></linearGradient>
+    <filter id="shadow" x="39" y="13" width="661" height="574" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#041F3B" flood-opacity=".28"/></filter>
+    <filter id="smallShadow" x="0" y="0" width="720" height="600" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="10" stdDeviation="11" flood-color="#041F3B" flood-opacity=".22"/></filter>
+    <clipPath id="panelClip"><rect x="103" y="80" width="508" height="424" rx="20"/></clipPath>
+  </defs>
+
+  <circle cx="387" cy="293" r="254" stroke="#70A5D5" stroke-opacity=".26" stroke-width="1.5"/>
+  <circle cx="387" cy="293" r="202" stroke="#70A5D5" stroke-opacity=".14" stroke-width="1.5"/>
+  <path d="M46 122h78M598 467h79M603 193h48" stroke="#7EB2DD" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="47" cy="122" r="4" fill="#F0C75E"/><circle cx="677" cy="467" r="4" fill="#F0C75E"/><circle cx="650" cy="193" r="3" fill="#9BC7EB"/>
+
+  <g filter="url(#shadow)">
+    <rect x="103" y="80" width="508" height="424" rx="20" fill="url(#panel)"/>
+    <g clip-path="url(#panelClip)">
+      <rect x="103" y="80" width="508" height="70" fill="#142F50"/>
+      <rect x="126" y="106" width="18" height="18" rx="4" fill="#F0C75E"/>
+      <path d="m131 115 4 4 5-7" stroke="#142F50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="157" y="119" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" letter-spacing="1.5">LEARNING STUDIO</text>
+      <circle cx="556" cy="115" r="12" fill="#315577"/><circle cx="556" cy="112" r="4" fill="#DDEAF6"/><path d="M549 121c2-4 12-4 14 0" stroke="#DDEAF6" stroke-width="2" stroke-linecap="round"/>
+
+      <rect x="103" y="150" width="113" height="354" fill="#F1F5FB"/>
+      <rect x="117" y="177" width="85" height="31" rx="5" fill="#DCEBFB"/>
+      <circle cx="133" cy="192" r="5" fill="#2E6DB7"/>
+      <rect x="145" y="189" width="44" height="5" rx="2.5" fill="#2E6DB7"/>
+      <circle cx="133" cy="233" r="5" stroke="#8BA4BF" stroke-width="2"/>
+      <rect x="145" y="230" width="39" height="5" rx="2.5" fill="#A5B5C9"/>
+      <circle cx="133" cy="271" r="5" stroke="#8BA4BF" stroke-width="2"/>
+      <rect x="145" y="268" width="47" height="5" rx="2.5" fill="#A5B5C9"/>
+      <path d="M118 308h83" stroke="#D4E0ED"/>
+      <rect x="122" y="332" width="73" height="55" rx="7" fill="#FFFFFF" stroke="#D7E2EF"/>
+      <path d="M134 353h39M134 362h28" stroke="#B1C2D4" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="183" cy="350" r="5" fill="#F0C75E"/>
+
+      <text x="239" y="184" fill="#173653" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Your learning path</text>
+      <text x="239" y="208" fill="#7288A0" font-family="Arial, Helvetica, sans-serif" font-size="12">Practice by topic. Build confidence as you go.</text>
+
+      <rect x="239" y="228" width="347" height="68" rx="10" fill="#FFFFFF" stroke="#D9E5F0"/>
+      <rect x="254" y="244" width="38" height="38" rx="8" fill="#E6F0FC"/>
+      <circle cx="268" cy="255" r="3" fill="#2771BA"/><circle cx="279" cy="262" r="3" fill="#2771BA"/><circle cx="266" cy="272" r="3" fill="#2771BA"/>
+      <path d="m268 255 11 7-13 10" stroke="#2771BA" stroke-width="2"/>
+      <text x="307" y="255" fill="#193A5B" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">Networking fundamentals</text>
+      <text x="307" y="273" fill="#7890A8" font-family="Arial, Helvetica, sans-serif" font-size="10">Routing · switching · IP</text>
+      <rect x="485" y="278" width="84" height="4" rx="2" fill="#E4ECF5"/><rect x="485" y="278" width="58" height="4" rx="2" fill="#2D78BF"/>
+
+      <rect x="239" y="308" width="347" height="68" rx="10" fill="#FFFFFF" stroke="#D9E5F0"/>
+      <rect x="254" y="324" width="38" height="38" rx="8" fill="#FFF2D4"/>
+      <path d="m273 332 11 4v7c0 8-6 12-11 14-5-2-11-6-11-14v-7l11-4Z" stroke="#B78922" stroke-width="2" stroke-linejoin="round"/>
+      <path d="m269 344 3 3 6-7" stroke="#B78922" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="307" y="335" fill="#193A5B" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">Cybersecurity essentials</text>
+      <text x="307" y="353" fill="#7890A8" font-family="Arial, Helvetica, sans-serif" font-size="10">Controls · threats · response</text>
+      <rect x="485" y="358" width="84" height="4" rx="2" fill="#E4ECF5"/><rect x="485" y="358" width="38" height="4" rx="2" fill="#E9B840"/>
+
+      <rect x="239" y="388" width="347" height="68" rx="10" fill="#FFFFFF" stroke="#D9E5F0"/>
+      <rect x="254" y="404" width="38" height="38" rx="8" fill="#E7F5EF"/>
+      <path d="M264 429h19a6 6 0 0 0 0-12h-2a8 8 0 0 0-15-2 7 7 0 0 0-2 14Z" stroke="#328669" stroke-width="2" stroke-linejoin="round"/>
+      <text x="307" y="415" fill="#193A5B" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">Cloud &amp; systems</text>
+      <text x="307" y="433" fill="#7890A8" font-family="Arial, Helvetica, sans-serif" font-size="10">Infrastructure · operations</text>
+      <rect x="485" y="438" width="84" height="4" rx="2" fill="#E4ECF5"/><rect x="485" y="438" width="25" height="4" rx="2" fill="#4EAA86"/>
+    </g>
+  </g>
+
+  <g filter="url(#smallShadow)">
+    <rect x="494" y="28" width="150" height="130" rx="12" fill="#FFFFFF"/>
+    <rect x="509" y="43" width="120" height="100" rx="6" stroke="#D7E5F2" stroke-width="2"/>
+    <path d="M528 66h82M528 77h62" stroke="#9FB4C9" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="570" cy="111" r="17" fill="#F0C75E"/><path d="m562 111 6 6 11-13" stroke="#284C6B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m559 125-5 17 14-7m13-10 5 17-14-7" fill="#D8A62D"/>
+  </g>
+
+  <g filter="url(#smallShadow)">
+    <rect x="50" y="413" width="295" height="127" rx="12" fill="url(#screen)" stroke="#7AA9D1"/>
+    <circle cx="70" cy="434" r="3" fill="#F0C75E"/><circle cx="82" cy="434" r="3" fill="#9CBEDA"/><circle cx="94" cy="434" r="3" fill="#9CBEDA"/>
+    <text x="66" y="464" fill="#AFC9E2" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5">HANDS-ON LAB</text>
+    <text x="66" y="492" fill="#E8F2FA" font-family="Consolas, monospace" font-size="13">R1&gt; show ip route</text>
+    <rect x="66" y="507" width="181" height="6" rx="3" fill="#355C7E"/><rect x="66" y="507" width="127" height="6" rx="3" fill="#62B3A4"/>
+    <circle cx="308" cy="490" r="17" fill="#DFF4EC"/><path d="m300 490 6 6 11-13" stroke="#348E70" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

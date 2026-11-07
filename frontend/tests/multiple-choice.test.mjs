@@ -9,10 +9,11 @@ const require = createRequire(new URL("../package.json", import.meta.url));
 const jsx = require("react/jsx-runtime");
 const plain = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+const label = node => [node.props.children].flat(Infinity).filter(value => typeof value === "string" || typeof value === "number").join("");
 const options = ["10.0.0.1", "8.8.8.8", "192.168.1.1", "1.1.1.1"].map((text, i) => ({ id: String.fromCharCode(65 + i), text }));
 const question = (extra = {}) => ({ type: "MULTIPLE_CHOICE", text: "Which addresses are private?", options, correctOptionIds: ["A", "C"], explanation: "Private ranges", accessLevel: "FREE", topic: "IPv4", difficulty: "EASY", imageUrl: "", displayOrder: 1, ...extra });
 
-function harness(file, api = async () => ({})) {
+function harness(file, api = async () => ({}), editorChecks) {
   let cursor = 0, refCursor = 0, first = true;
   const states = [], refs = [], effects = [];
   const modules = {
@@ -35,9 +36,10 @@ function harness(file, api = async () => ({})) {
     "@/components/choice-question": { ChoiceQuestion: "choice" },
     "./pbq-editor": { PbqEditor: "pbq-editor", pbqIssues: () => [] },
     "./drag-drop-editor": { DragDropEditor: "drag-editor", dragDropIssues: () => [] },
+    "./question-editor": { QuestionEditor: "question-editor", questionIssues: editorChecks?.questionIssues || (() => []), importQuestionIssues: editorChecks?.importQuestionIssues || (() => []) },
     "./ui": { inputClass: "input", primaryButton: "primary", secondaryButton: "secondary" },
   };
-  const context = { exports: {}, require: name => { assert.ok(name in modules, name); return modules[name]; }, setTimeout, clearTimeout, window: { confirm: () => { throw new Error("MCQ type changes must preserve content without a destructive confirmation"); }, addEventListener() {}, removeEventListener() {} }, Date };
+  const context = { exports: {}, require: name => { assert.ok(name in modules, name); return modules[name]; }, setTimeout, clearTimeout, FormData, URL, window: { confirm: () => { throw new Error("MCQ type changes must preserve content without a destructive confirmation"); }, addEventListener() {}, removeEventListener() {} }, Date };
   vm.runInNewContext(ts.transpileModule(readFileSync(new URL(`../components/${file}.tsx`, import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, context);
   function render(name, props) {
     cursor = 0; refCursor = 0;
@@ -47,6 +49,99 @@ function harness(file, api = async () => ({})) {
   }
   return { render, exports: context.exports, mount: () => effects.forEach(fn => fn()) };
 }
+
+test("admin import offers separate document and JSON tabs with a JSON template", () => {
+  const h = harness("admin/import-questions");
+  const render = () => h.render("ImportQuestions", { examId: "exam-1", onImported() {} });
+  let nodes = render();
+  assert.equal(nodes.find(node => node.props.id === "import-files-tab").props["aria-selected"], true);
+  assert.equal(nodes.find(node => node.props["aria-label"] === "Import question file").props.accept, ".pdf,.docx,.xlsx,.csv");
+  nodes.find(node => node.props.id === "import-json-tab").props.onClick();
+  nodes = render();
+  assert.equal(nodes.find(node => node.props.id === "import-json-tab").props["aria-selected"], true);
+  assert.equal(nodes.find(node => node.props["aria-label"] === "Import JSON question file").props.accept, ".json,application/json");
+  assert.ok(nodes.some(node => node.props.href === "/api/backend/exams/templates/json"));
+});
+
+test("import review filters doubtful and missing-answer rows and blocks invalid bulk selections", async () => {
+  const editorChecks = harness("admin/question-editor").exports;
+  const rows = [
+    question({ text: "Clean question", sourceNumber: 1 }),
+    question({ text: "Needs source review", sourceNumber: 2, importWarnings: ["Check the diagram"] }),
+    question({ text: "No answer key", sourceNumber: 3, correctOptionIds: [], importErrors: ["Answer key missing"] }),
+    question({ text: "Suspected duplicate", sourceNumber: 4, duplicate: true }),
+    question({ text: "Repeated number", sourceNumber: 4, duplicateSourceNumber: true }),
+  ];
+  const report = { sourceKind: "json", detectedHeadings: 5, detectedAnswerLines: null, numberedRange: null, extracted: 5, readyToImport: 4, readyToPublish: 4, missingAnswers: 1, missingExplanations: 0, needsSourceReview: 1, duplicateNumbers: 1, missingNumbers: [], hasSimulationSection: false };
+  const h = harness("admin/import-questions", async path => {
+    assert.match(path, /\/import\/preview$/);
+    return { questions: rows, report };
+  }, editorChecks);
+  const render = () => h.render("ImportQuestions", { examId: "exam-1", onImported() {} });
+  render().find(node => node.props["aria-label"] === "Import question file").props.onChange({ target: { files: [{ name: "sample.json" }] } });
+  await tick();
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 1").props.checked, true);
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 2").props.checked, false);
+  render().find(node => node.type === "button" && label(node) === "Select all 5").props.onClick();
+  assert.equal(render().find(node => node.type === "button" && label(node).includes("selected drafts")).props.disabled, true);
+  render().find(node => node.type === "button" && label(node) === "Select valid 3").props.onClick();
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 2").props.checked, true);
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 3").props.checked, false);
+  render().find(node => node.props["aria-label"] === "Filter review status").props.onChange({ target: { value: "review" } });
+  assert.equal(render().filter(node => String(node.props["aria-label"] || "").startsWith("Import row ")).length, 3);
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 2").props.checked, true);
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 4").props.checked, false);
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 5").props.checked, true);
+  render().find(node => node.props["aria-label"] === "Filter review status").props.onChange({ target: { value: "all" } });
+  render().find(node => node.props["aria-label"] === "Filter answer key").props.onChange({ target: { value: "missing" } });
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 3").props.checked, false);
+  assert.equal(render().filter(node => String(node.props["aria-label"] || "").startsWith("Import row ")).length, 1);
+  render().find(node => node.type === "button" && label(node) === "Fix").props.onClick();
+  assert.equal(render().find(node => node.props.role === "dialog").props["aria-modal"], "true");
+  assert.ok(render().some(node => node.props["aria-label"] === "Close correction"));
+  await render().find(node => node.type === "question-editor").props.onSave({ ...rows[2], correctOptionIds: ["A", "C"] });
+  assert.equal(render().some(node => node.props.role === "dialog"), false);
+  assert.equal(render().filter(node => String(node.props["aria-label"] || "").startsWith("Import row ")).length, 0);
+  render().find(node => node.props["aria-label"] === "Filter answer key").props.onChange({ target: { value: "all" } });
+  render().find(node => node.props["aria-label"] === "Filter review status").props.onChange({ target: { value: "clean" } });
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 3").props.checked, true);
+  render().find(node => node.type === "button" && label(node) === "Select clean 2").props.onClick();
+  assert.equal(render().find(node => node.type === "button" && label(node).includes("selected drafts")).props.disabled, false);
+  render().find(node => node.props["aria-label"] === "Filter review status").props.onChange({ target: { value: "review" } });
+  render().find(node => node.props["aria-label"] === "Filter answer key").props.onChange({ target: { value: "all" } });
+  render().find(node => node.type === "button" && label(node) === "Fix").props.onClick();
+  await render().find(node => node.type === "question-editor").props.onSave(rows[1]);
+  assert.equal(render().some(node => node.props.role === "dialog"), false);
+  assert.equal(render().filter(node => String(node.props["aria-label"] || "").startsWith("Import row ")).length, 2);
+  render().find(node => node.props["aria-label"] === "Filter review status").props.onChange({ target: { value: "clean" } });
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 2").props.checked, true);
+  assert.ok(render().some(node => node.type === "span" && label(node) === "Ready"));
+});
+
+test("reviewing a doubtful duplicate moves it to Ready and permits its import", async () => {
+  const editorChecks = harness("admin/question-editor").exports;
+  const row = question({ text: "Possible duplicate", duplicate: true, importWarnings: ["Verify against source"] });
+  const report = { sourceKind: "json", detectedHeadings: 1, detectedAnswerLines: null, numberedRange: null, extracted: 1, readyToImport: 1, readyToPublish: 1, missingAnswers: 0, missingExplanations: 0, needsSourceReview: 1, duplicateNumbers: 0, missingNumbers: [], hasSimulationSection: false };
+  let committed, imported = 0;
+  const h = harness("admin/import-questions", async (path, options) => {
+    if (path.endsWith("/import/preview")) return { questions: [row], report };
+    committed = JSON.parse(options.body);
+    return { imported: 1 };
+  }, editorChecks);
+  const render = () => h.render("ImportQuestions", { examId: "exam-1", onImported() { imported++; } });
+  render().find(node => node.props["aria-label"] === "Import question file").props.onChange({ target: { files: [{ name: "sample.json" }] } });
+  await tick();
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 1").props.checked, false);
+  render().find(node => node.type === "button" && label(node) === "Fix").props.onClick();
+  await render().find(node => node.type === "question-editor").props.onSave(row);
+  assert.ok(render().some(node => node.type === "span" && label(node) === "Ready"));
+  assert.equal(render().find(node => node.props["aria-label"] === "Import row 1").props.checked, true);
+  assert.equal(render().find(node => node.type === "button" && label(node).includes("selected drafts")).props.disabled, false);
+  render().find(node => node.type === "button" && label(node).includes("selected drafts")).props.onClick();
+  await tick();
+  assert.equal(committed.allowDuplicates, true);
+  assert.equal(imported, 1);
+});
 
 test("student multiple answers toggle independently, clear and remain keyboard-native checkboxes", () => {
   const h = harness("choice-question"); let value = [];
@@ -78,7 +173,7 @@ test("admin preserves options when changing MCQ type, selects multiple keys, pre
   const props = { initial: question({ type: "SINGLE_CHOICE", correctOptionIds: ["A"] }), onSave: async q => { saved = q; } };
   const render = () => h.render("QuestionEditor", props);
   render().find(n => n.type === "select" && n.props.value === "SINGLE_CHOICE").props.onChange({ target: { value: "MULTIPLE_CHOICE" } });
-  assert.ok(render().some(n => n.type === "li" && n.props.children === "Select two to four correct answers"));
+  assert.ok(render().some(n => n.type === "li" && n.props.children === "Select two or more correct answers"));
   render().find(n => n.props["aria-label"] === "Option C is correct").props.onChange();
   assert.ok(!render().some(n => n.type === "li"));
   assert.equal(render().find(n => n.props["aria-label"] === "Option C").props.value, options[2].text);
@@ -101,7 +196,31 @@ test("import corrections offer both MCQ types, not unsupported drag-and-drop/PBQ
   const tree = h.render("QuestionEditor", { initial: question(), importMode: true, onSave: async () => {} });
   assert.ok(tree.some(n => n.type === "option" && n.props.value === "MULTIPLE_CHOICE"));
   assert.ok(!tree.some(n => n.type === "option" && ["DRAG_DROP", "IMAGE_PBQ"].includes(n.props.value)));
+  assert.ok(!tree.some(n => n.type === "button" && label(n) === "Student preview"));
+  assert.ok(tree.some(n => n.type === "button" && label(n) === "Save & move to Ready"));
   assert.equal(tree.find(n => n.type === "select" && n.props.value === "MULTIPLE_CHOICE").props.disabled, undefined);
+});
+
+test("import editor enables move to Ready only after the missing answer is corrected", () => {
+  const h = harness("admin/question-editor");
+  const render = () => h.render("QuestionEditor", { initial: question({ correctOptionIds: [], explanation: "" }), importMode: true, onSave: async () => {} });
+  const save = () => render().find(n => n.type === "button" && label(n) === "Save & move to Ready");
+  assert.equal(save().props.disabled, true);
+  render().find(n => n.props["aria-label"] === "Option A is correct").props.onChange();
+  render().find(n => n.props["aria-label"] === "Option C is correct").props.onChange();
+  assert.equal(save().props.disabled, false);
+});
+
+test("admin can add option E and publish without an explanation", () => {
+  const h = harness("admin/question-editor");
+  const render = () => h.render("QuestionEditor", { initial: question({ type: "SINGLE_CHOICE", correctOptionIds: ["A"] }), onSave: async () => {} });
+  render().find(n => n.type === "button" && n.props.children === "Add option").props.onClick();
+  render().find(n => n.props["aria-label"] === "Option E").props.onChange({ target: { value: "Fifth option" } });
+  render().find(n => n.props["aria-label"] === "Option E is correct").props.onChange();
+  assert.deepEqual(plain(h.exports.questionIssues({ ...question(), type: "SINGLE_CHOICE", options: [...options, { id: "E", text: "Fifth option" }], correctOptionIds: ["E"] })), []);
+  assert.deepEqual(plain(h.exports.questionIssues({ ...question(), explanation: "" })), []);
+  assert.deepEqual(plain(h.exports.importQuestionIssues({ ...question(), explanation: "" })), []);
+  assert.equal(render().find(n => n.props["aria-label"] === "Option E is correct").props.checked, true);
 });
 
 test("runner resumes multiple selections and coalesces rapid changes without losing review markers", async () => {

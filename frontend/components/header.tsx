@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Search, ShoppingBag, UserRound, X } from "lucide-react";
+import { BookOpen, Menu, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ProfileMenu } from "./profile-menu";
 import { CategoryMenu } from "./category-menu";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+import { Brand } from "./brand";
 
 export function Header() {
   const pathname = usePathname();
@@ -17,11 +16,6 @@ export function Header() {
   } | null>(null);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [open, setOpen] = useState(false);
-  const [announcement, setAnnouncement] = useState({
-    title: "New practice exams are now available.",
-    buttonText: "Explore exams",
-    buttonUrl: "/exams",
-  });
 
   useEffect(() => {
     let active = true;
@@ -53,103 +47,20 @@ export function Header() {
     };
   }, [pathname]);
 
-  useEffect(() => {
-    fetch(`${apiUrl}/banners/active`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((items) => {
-        const item = items.find(
-          (banner: { type: string }) => banner.type === "ANNOUNCEMENT",
-        );
-        if (item) setAnnouncement(item);
-      })
-      .catch(() => undefined);
-  }, []);
-
   return (
-    <div className="relative z-50 bg-white">
-      <div className="flex min-h-9 items-center justify-center gap-2 bg-slate-900 px-5 py-2 text-center text-xs text-white">
-        <span className="font-medium">{announcement.title}</span>
-        {announcement.buttonUrl && (
-          <Link
-            className="font-bold underline underline-offset-2"
-            href={announcement.buttonUrl}
-          >
-            {announcement.buttonText || "Learn more"}
-          </Link>
-        )}
-      </div>
-      <header className="sticky top-0 flex h-[76px] items-center gap-9 border-b border-slate-200 bg-white px-5 lg:px-[max(20px,calc((100vw-1180px)/2))]">
-        <Link
-          className="inline-flex items-center gap-2.5 text-2xl font-extrabold tracking-tight"
-          href="/"
-          aria-label="Certify home"
-        >
-          <span className="grid size-9 place-items-center rounded-lg bg-violet-600 text-xl text-white">
-            C
-          </span>
-          Certify
-        </Link>
-        <nav
-          className={`${open ? "flex" : "hidden"} absolute inset-x-0 top-[76px] flex-col gap-5 border-b border-slate-200 bg-white p-5 text-sm font-semibold shadow-xl lg:static lg:flex lg:flex-row lg:border-0 lg:p-0 lg:shadow-none`}
-          aria-label="Primary navigation"
-        >
-          <Link className="hover:text-violet-600" href="/exams">
-            Exams
-          </Link>
-          <Link className="hover:text-violet-600" href="/labs">Labs</Link>
+    <div className="portal-header-wrap">
+      <header className="portal-header portal-container" onKeyDown={event => { if (event.key === "Escape") setOpen(false); }}>
+        <Brand />
+        <nav id="primary-navigation" className={`portal-nav ${open ? "is-open" : ""}`} aria-label="Primary navigation">
+          {([["/", "Home"], ["/exams", "Exams"], ["/labs", "Labs"]] as const).map(([href, label]) => <Link key={href} href={href} aria-current={pathname === href || (href !== "/" && pathname.startsWith(href + "/")) ? "page" : undefined} onClick={() => setOpen(false)}>{label}</Link>)}
           <CategoryMenu key={pathname} defaultKind={pathname.startsWith("/labs") ? "labs" : "exams"} onNavigate={() => setOpen(false)} />
-          <Link className="hover:text-violet-600" href="/blog">
-            Articles
-          </Link>
-          <Link className="hover:text-violet-600" href="/about">
-            About
-          </Link>
+          <Link href="/about" aria-current={pathname === "/about" ? "page" : undefined} onClick={() => setOpen(false)}>About</Link>
+          <Link href="/faq" onClick={() => setOpen(false)} className="portal-mobile-help">Help & FAQs</Link>
         </nav>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            className="hidden size-10 place-items-center bg-transparent text-slate-900 sm:grid"
-            aria-label="Search"
-          >
-            <Search size={20} />
-          </button>
-          <Link
-            className="grid size-10 place-items-center"
-            href="/dashboard"
-            aria-label="My learning"
-          >
-            <ShoppingBag size={20} />
-          </Link>
-          {user ? (
-            <ProfileMenu key={pathname} user={user} />
-          ) : sessionChecked ? (
-            <>
-              <Link
-                className="hidden min-h-11 items-center gap-2 border border-slate-900 px-4 text-sm font-bold hover:bg-slate-50 sm:inline-flex"
-                href="/login"
-              >
-                <UserRound size={18} />
-                Log in
-              </Link>
-              <Link
-                className="inline-flex min-h-11 items-center bg-violet-600 px-4 text-sm font-bold text-white hover:bg-violet-700"
-                href="/register"
-              >
-                Join now
-              </Link>
-            </>
-          ) : (
-            <span
-              aria-label="Checking your session"
-              className="h-10 w-20 animate-pulse rounded-full bg-slate-100"
-            />
-          )}
-          <button
-            className="grid size-10 place-items-center lg:hidden"
-            onClick={() => setOpen(!open)}
-            aria-label="Toggle menu"
-          >
-            {open ? <X /> : <Menu />}
-          </button>
+        <div className="portal-header-actions">
+          <Link className="portal-icon-button portal-header-search" href="/exams" aria-label="Search exam library"><Search size={20} /></Link>
+          {user ? <><Link className="portal-icon-button portal-learning-link" href="/dashboard" aria-label="My learning"><BookOpen size={20} /></Link><ProfileMenu key={pathname} user={user} /></> : sessionChecked ? <><Link className="portal-login-link" href="/login">Log in</Link><Link className="portal-button portal-register-link" href="/register">Get started <span aria-hidden="true">↗</span></Link></> : <span aria-label="Checking your session" className="h-10 w-20 animate-pulse rounded-md bg-slate-100" />}
+          <button className="portal-icon-button portal-menu-toggle" onClick={() => setOpen(!open)} aria-label={open ? "Close navigation" : "Open navigation"} aria-expanded={open} aria-controls="primary-navigation">{open ? <X /> : <Menu />}</button>
         </div>
       </header>
     </div>
