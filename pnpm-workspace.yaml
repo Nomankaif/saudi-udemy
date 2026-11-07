@@ -4,8 +4,6 @@ packages:
 
 allowBuilds:
   '@parcel/watcher': false
-  tesseract.js: set this to true or false
+  sharp: true
+  tesseract.js: true
   unrs-resolver: false
-
-onlyBuiltDependencies:
-  - "sharp"
