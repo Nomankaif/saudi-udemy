@@ -1,6 +1,6 @@
 export type CategoryOption = { name: string; subcategories: { name: string }[] };
 export interface ExamSummary {
-  kind?: "EXAM" | "DRAG_DROP";
+  kind?: "EXAM" | "DRAG_DROP" | "PBQ";
   id: string;
   slug: string;
   title: string;

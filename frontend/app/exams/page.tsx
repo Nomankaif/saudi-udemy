@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { ExamCard } from "@/components/exam-card";
-import { publicExams } from "@/lib/exams";
+import { publicExams, publicPerformanceBased } from "@/lib/exams";
 import { CatalogFilters } from "@/components/catalog-filters";
 import { CatalogHeading } from "@/components/catalog-heading";
 import { CatalogCategoryFields } from "@/components/catalog-category-fields";
@@ -20,7 +20,8 @@ export default async function ExamsPage({ searchParams }: {
   const subcategory = category && typeof params.subcategory === "string" ? params.subcategory : "";
   const access = ["free", "premium"].includes(params.access || "") ? params.access : "";
   const sort = ["rating", "newest", "title", "questions"].includes(params.sort || "") ? params.sort || "newest" : "newest";
-  const exams = await publicExams();
+  const [publishedExams, publishedPbqs] = await Promise.all([publicExams(), publicPerformanceBased()]);
+  const exams = [...publishedExams, ...publishedPbqs];
   const query = q.trim().toLowerCase();
   const filtered = exams.filter(exam =>
     (!query || exam.title.toLowerCase().includes(query)) &&
